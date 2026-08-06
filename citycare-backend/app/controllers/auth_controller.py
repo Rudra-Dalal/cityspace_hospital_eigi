@@ -1,0 +1,106 @@
+"""Auth business logic."""
+
+from fastapi import HTTPException, status
+from pymongo.errors import DuplicateKeyError
+
+from app.core.security import create_access_token, hash_password, verify_password
+from app.cruds import user_crud
+from app.models.user_model import UserRole, serialize_user, user_document
+from app.schemas.user_schema import LoginRequest, SignupRequest, TokenResponse, UserOut
+from app.utils.logger import get_logger
+
+logger = get_logger(__name__)
+
+
+async def signup(payload: SignupRequest) -> UserOut:
+    """Public signup ALWAYS creates a patient — role from the body is ignored."""
+    existing = await user_crud.get_user_by_email(payload.email)
+    if existing:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="An account with this email already exists.",
+        )
+
+    doc = user_document(
+        first_name=payload.first_name,
+        last_name=payload.last_name,
+        email=payload.email,
+        mobile=payload.mobile,
+        password_hash=hash_password(payload.password),
+        role=UserRole.PATIENT,  # never trust client-supplied role
+    )
+
+    try:
+        created = await user_crud.create_user(doc)
+    except DuplicateKeyError:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="An account with this email already exists.",
+        )
+
+    logger.info("Patient signed up: %s", created["email"])
+    return UserOut(**serialize_user(created))
+
+
+async def login(payload: LoginRequest) -> TokenResponse:
+    # Identical message for wrong email OR wrong password (no user enumeration)
+    invalid_msg = "Incorrect email or password."
+    user = await user_crud.get_user_by_email(payload.email)
+    if not user or not verify_password(payload.password, user["password_hash"]):
+        logger.warning("Authentication failed for email=%s", payload.email)
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail=invalid_msg,
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+    token = create_access_token(
+        {
+            "sub": str(user["_id"]),
+            "email": user["email"],
+            "role": user["role"],
+        }
+    )
+    logger.info("User logged in: %s (role=%s)", user["email"], user["role"])
+    return TokenResponse(
+        access_token=token,
+        user=UserOut(**serialize_user(user)),
+    )
+
+
+async def seed_doctor_if_missing() -> None:
+    """Create the single doctor account from env vars if it does not exist."""
+    from app.core.config import get_settings
+
+    settings = get_settings()
+    existing = await user_crud.get_user_by_email(settings.doctor_email)
+    if existing:
+        if existing.get("role") != UserRole.DOCTOR.value:
+            # Ensure role is doctor if email matches seed
+            from app.core.database import get_database
+            from datetime import datetime, timezone
+
+            await get_database().users.update_one(
+                {"_id": existing["_id"]},
+                {
+                    "$set": {
+                        "role": UserRole.DOCTOR.value,
+                        "updated_at": datetime.now(timezone.utc),
+                    }
+                },
+            )
+            logger.info("Updated existing user to doctor role: %s", settings.doctor_email)
+        else:
+            logger.info("Doctor account already present: %s", settings.doctor_email)
+        return
+
+    doc = user_document(
+        first_name=settings.doctor_first_name,
+        last_name=settings.doctor_last_name,
+        email=settings.doctor_email,
+        mobile="+919999999999",
+        password_hash=hash_password(settings.doctor_password),
+        role=UserRole.DOCTOR,
+    )
+    await user_crud.create_user(doc)
+    logger.info("Seeded doctor account: %s", settings.doctor_email)
