@@ -111,6 +111,22 @@ async def count_upcoming_booked(
     return await db.appointments.count_documents(query)
 
 
+async def get_upcoming_appointments(
+    from_date: str,
+    doctor_id: Optional[str] = None,
+    hospital_id: Optional[str] = None,
+) -> List[Dict[str, Any]]:
+    """Return all appointments on from_date or later, sorted by date then slot."""
+    db = get_database()
+    query: Dict[str, Any] = {"date": {"$gte": from_date}}
+    if doctor_id:
+        query["doctor_id"] = doctor_id
+    if hospital_id:
+        query["hospital_id"] = hospital_id
+    cursor = db.appointments.find(query).sort([("date", 1), ("slot", 1)])
+    return [doc async for doc in cursor]
+
+
 async def get_appointment_by_id(appointment_id: str) -> Optional[Dict[str, Any]]:
     db = get_database()
     try:

@@ -25,10 +25,10 @@ async def doctor_info():
 
 @router.get("/schedule", response_model=List[ScheduleItem])
 async def doctor_schedule(
-    date: str = Query(..., description="ISO date YYYY-MM-DD"),
+    date: str = Query(None, description="ISO date YYYY-MM-DD — omit for all upcoming"),
     current_user: Dict[str, Any] = _require_doctor,
 ):
-    """Full schedule for a date — doctor/manager/admin only. Customers receive 403."""
+    """Full schedule — doctor/manager/admin only. Omit date for all upcoming."""
     return await doctor_controller.get_schedule(date, current_user)
 
 

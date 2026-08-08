@@ -30,14 +30,15 @@ def get_doctor_info() -> DoctorInfoResponse:
     )
 
 
-async def get_schedule(date_str: str, current_user: Dict[str, Any]) -> List[ScheduleItem]:
-    try:
-        date_cls.fromisoformat(date_str)
-    except ValueError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="date must be a valid ISO date YYYY-MM-DD",
-        ) from exc
+async def get_schedule(date_str: Optional[str], current_user: Dict[str, Any]) -> List[ScheduleItem]:
+    if date_str is not None:
+        try:
+            date_cls.fromisoformat(date_str)
+        except ValueError as exc:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="date must be a valid ISO date YYYY-MM-DD",
+            ) from exc
 
     # Super admin can see all; doctor/manager scoped to their hospital
     doctor_id: Optional[str] = None
@@ -51,11 +52,20 @@ async def get_schedule(date_str: str, current_user: Dict[str, Any]) -> List[Sche
         hospital_id = current_user.get("hospital_id")
     # super_admin: no scoping
 
-    appointments = await appointment_crud.get_appointments_for_date(
-        date_str,
-        doctor_id=doctor_id,
-        hospital_id=hospital_id,
-    )
+    if date_str is None:
+        # No date provided — return all upcoming (today + future) appointments
+        today = datetime.now(timezone.utc).date().isoformat()
+        appointments = await appointment_crud.get_upcoming_appointments(
+            today,
+            doctor_id=doctor_id,
+            hospital_id=hospital_id,
+        )
+    else:
+        appointments = await appointment_crud.get_appointments_for_date(
+            date_str,
+            doctor_id=doctor_id,
+            hospital_id=hospital_id,
+        )
     patient_ids = list({a["patient_id"] for a in appointments})
     patients = await user_crud.get_users_by_ids(patient_ids)
 
