@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { api, formatApiDetail, setStoredAuth } from '../api/client'
 import FormInput from '../components/FormInput'
+import { ROLE_HOME } from '../components/ProtectedRoute'
 
 export default function Login() {
   const navigate = useNavigate()
@@ -29,7 +30,8 @@ export default function Login() {
     try {
       const data = await api.login({ email: email.trim(), password })
       setStoredAuth({ token: data.access_token, user: data.user })
-      navigate(data.user.role === 'doctor' ? '/doctor' : '/dashboard', { replace: true })
+      const home = ROLE_HOME[data.user.role] ?? '/patient/dashboard'
+      navigate(home, { replace: true })
     } catch (err) {
       setApiError(formatApiDetail(err.detail || err.message))
     } finally {

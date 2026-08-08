@@ -1,7 +1,8 @@
-"""Doctor / clinic business logic."""
+"""Doctor / clinic business logic — now hospital-scoped."""
 
 from datetime import date as date_cls
 from datetime import datetime, timezone
+from typing import Any, Dict, List, Optional
 
 from fastapi import HTTPException, status
 
@@ -29,7 +30,7 @@ def get_doctor_info() -> DoctorInfoResponse:
     )
 
 
-async def get_schedule(date_str: str) -> list[ScheduleItem]:
+async def get_schedule(date_str: str, current_user: Dict[str, Any]) -> List[ScheduleItem]:
     try:
         date_cls.fromisoformat(date_str)
     except ValueError as exc:
@@ -38,11 +39,27 @@ async def get_schedule(date_str: str) -> list[ScheduleItem]:
             detail="date must be a valid ISO date YYYY-MM-DD",
         ) from exc
 
-    appointments = await appointment_crud.get_appointments_for_date(date_str)
+    # Super admin can see all; doctor/manager scoped to their hospital
+    doctor_id: Optional[str] = None
+    hospital_id: Optional[str] = None
+
+    role = current_user.get("role")
+    if role == "doctor":
+        doctor_id = str(current_user["_id"])
+        hospital_id = current_user.get("hospital_id")
+    elif role == "hospital_manager":
+        hospital_id = current_user.get("hospital_id")
+    # super_admin: no scoping
+
+    appointments = await appointment_crud.get_appointments_for_date(
+        date_str,
+        doctor_id=doctor_id,
+        hospital_id=hospital_id,
+    )
     patient_ids = list({a["patient_id"] for a in appointments})
     patients = await user_crud.get_users_by_ids(patient_ids)
 
-    items: list[ScheduleItem] = []
+    items: List[ScheduleItem] = []
     for appt in appointments:
         patient = patients.get(appt["patient_id"])
         name = (
@@ -65,11 +82,23 @@ async def get_schedule(date_str: str) -> list[ScheduleItem]:
     return items
 
 
-async def get_stats() -> DoctorStatsResponse:
+async def get_stats(current_user: Dict[str, Any]) -> DoctorStatsResponse:
     today = datetime.now(timezone.utc).date().isoformat()
+
+    role = current_user.get("role")
+    doctor_id: Optional[str] = None
+    hospital_id: Optional[str] = None
+
+    if role == "doctor":
+        doctor_id = str(current_user["_id"])
+        hospital_id = current_user.get("hospital_id")
+    elif role == "hospital_manager":
+        hospital_id = current_user.get("hospital_id")
+
     total_patients = await user_crud.count_patients()
-    today_visits = await appointment_crud.count_booked_for_date(today)
-    upcoming_visits = await appointment_crud.count_upcoming_booked(today)
+    today_visits = await appointment_crud.count_booked_for_date(today, doctor_id=doctor_id, hospital_id=hospital_id)
+    upcoming_visits = await appointment_crud.count_upcoming_booked(today, doctor_id=doctor_id, hospital_id=hospital_id)
+
     return DoctorStatsResponse(
         total_patients=total_patients,
         today_visits=today_visits,

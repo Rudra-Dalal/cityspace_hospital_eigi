@@ -1,4 +1,4 @@
-"""CityCare Clinic FastAPI application entrypoint."""
+"""CityCare — Multi-Tenant Hospital Platform API entrypoint."""
 
 from contextlib import asynccontextmanager
 
@@ -9,7 +9,9 @@ from fastapi.responses import JSONResponse
 from app.controllers.auth_controller import seed_doctor_if_missing
 from app.core.config import get_settings
 from app.core.database import close_mongo_connection, connect_to_mongo, ensure_indexes
+from app.core.migrate import run_migrations
 from app.routes import appointment_routes, auth_routes, doctor_routes
+from app.routes import admin_routes, manager_routes
 from app.utils.logger import get_logger
 
 logger = get_logger(__name__)
@@ -18,10 +20,11 @@ logger = get_logger(__name__)
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
     settings = get_settings()
-    logger.info("Starting CityCare Clinic API…")
+    logger.info("Starting CityCare Hospital Platform API…")
     await connect_to_mongo()
     await ensure_indexes()
-    await seed_doctor_if_missing()
+    await seed_doctor_if_missing()   # seeds doctor + super_admin accounts
+    await run_migrations()           # idempotent data migrations
     logger.info(
         "Startup complete. CORS origins=%s DB=%s",
         settings.cors_origins_list,
@@ -29,16 +32,17 @@ async def lifespan(_app: FastAPI):
     )
     yield
     await close_mongo_connection()
-    logger.info("CityCare Clinic API shut down.")
+    logger.info("CityCare Hospital Platform API shut down.")
 
 
 app = FastAPI(
-    title="CityCare Clinic API",
+    title="CityCare Hospital Platform API",
     description=(
-        "Single-doctor appointment booking for CityCare Clinic, Dharampeth, Nagpur. "
-        "JWT auth with patient/doctor roles. No double-booking via partial unique index."
+        "Multi-tenant hospital appointment booking platform. "
+        "Roles: super_admin | hospital_manager | doctor | customer. "
+        "JWT auth with hospital-scoped RBAC."
     ),
-    version="1.0.0",
+    version="2.0.0",
     lifespan=lifespan,
 )
 
@@ -51,14 +55,19 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# Existing routes
 app.include_router(auth_routes.router)
 app.include_router(doctor_routes.router)
 app.include_router(appointment_routes.router)
 
+# New multi-tenant routes
+app.include_router(admin_routes.router)
+app.include_router(manager_routes.router)
+
 
 @app.get("/health", tags=["Health"])
 async def health():
-    return {"status": "ok", "service": "CityCare Clinic API"}
+    return {"status": "ok", "service": "CityCare Hospital Platform API", "version": "2.0.0"}
 
 
 @app.exception_handler(Exception)

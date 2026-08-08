@@ -2,7 +2,7 @@
 
 from datetime import date as date_cls
 from datetime import datetime, timezone
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 
 from fastapi import HTTPException, status
 from pymongo.errors import DuplicateKeyError
@@ -47,9 +47,13 @@ def validate_booking_date(date_str: str) -> date_cls:
     return target
 
 
-async def get_free_slots(date_str: str) -> Dict[str, Any]:
+async def get_free_slots(date_str: str, doctor_id: Optional[str] = None, hospital_id: Optional[str] = None) -> Dict[str, Any]:
     validate_booking_date(date_str)
-    booked = set(await appointment_crud.get_booked_slots_for_date(date_str))
+    booked = set(await appointment_crud.get_booked_slots_for_date(
+        date_str,
+        doctor_id=doctor_id,
+        hospital_id=hospital_id,
+    ))
     free = [s for s in VALID_SLOTS if s not in booked]
     return {"date": date_str, "free_slots": free}
 
@@ -62,10 +66,11 @@ async def book_appointment(
     Gates 2–4 (Gate 1 already handled by auth dependency).
     Identity comes only from the JWT — never from the request body.
     """
-    if current_user.get("role") != "patient":
+    # Accept both "customer" and legacy "patient"
+    if current_user.get("role") not in ("customer", "patient"):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Only patients can book appointments.",
+            detail="Only customers can book appointments.",
         )
 
     validate_booking_date(payload.date)
@@ -76,8 +81,35 @@ async def book_appointment(
             detail=f"Invalid slot. Choose one of: {', '.join(VALID_SLOTS)}",
         )
 
+    # Resolve hospital and doctor for this booking
+    from app.cruds import hospital_crud
+    from app.core.database import get_database
+
+    hospital_id: Optional[str] = payload.hospital_id
+    doctor_id: Optional[str] = payload.doctor_id
+
+    # Fall back to the first active hospital/doctor if not provided (backward-compat)
+    if not hospital_id:
+        hospitals = await hospital_crud.get_all_hospitals(status="active")
+        if not hospitals:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="No active hospital found.",
+            )
+        hospital_id = str(hospitals[0]["_id"])
+
+    if not doctor_id:
+        db = get_database()
+        doctor = await db.users.find_one({"hospital_id": hospital_id, "role": "doctor"})
+        if not doctor:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="No doctor found for this hospital.",
+            )
+        doctor_id = str(doctor["_id"])
+
     # Polite pre-check (helpful early answer)
-    if await appointment_crud.slot_is_booked(payload.date, payload.slot):
+    if await appointment_crud.slot_is_booked(payload.date, payload.slot, doctor_id=doctor_id, hospital_id=hospital_id):
         logger.info(
             "Booking conflict (pre-check): date=%s slot=%s user=%s",
             payload.date,
@@ -91,6 +123,8 @@ async def book_appointment(
 
     doc = appointment_document(
         patient_id=str(current_user["_id"]),
+        hospital_id=hospital_id,
+        doctor_id=doctor_id,
         date=payload.date,
         slot=payload.slot,
         reason=payload.reason,
@@ -120,11 +154,13 @@ async def book_appointment(
         )
 
     logger.info(
-        "Appointment booked: id=%s date=%s slot=%s patient=%s",
+        "Appointment booked: id=%s date=%s slot=%s patient=%s hospital=%s doctor=%s",
         created["_id"],
         created["date"],
         created["slot"],
         current_user.get("email"),
+        hospital_id,
+        doctor_id,
     )
     return AppointmentOut(**serialize_appointment(created))
 
@@ -147,14 +183,24 @@ async def cancel_my_appointment(
             detail="Appointment not found.",
         )
 
-    # Ownership check — patients cancel only their own; doctors may cancel any
+    # Ownership check — customers cancel only their own; doctors/managers may cancel any in their hospital
     is_owner = appt["patient_id"] == str(current_user["_id"])
-    is_doctor = current_user.get("role") == "doctor"
-    if not is_owner and not is_doctor:
+    user_role = current_user.get("role", "")
+    is_privileged = user_role in ("doctor", "hospital_manager", "super_admin")
+
+    if not is_owner and not is_privileged:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="You do not have permission to cancel this appointment.",
         )
+
+    # Hospital scoping for managers/doctors
+    if is_privileged and user_role != "super_admin":
+        if appt.get("hospital_id") != current_user.get("hospital_id"):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="This appointment belongs to a different hospital.",
+            )
 
     if appt["status"] == AppointmentStatus.CANCELLED.value:
         raise HTTPException(

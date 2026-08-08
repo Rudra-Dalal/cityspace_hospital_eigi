@@ -130,7 +130,7 @@ export default function Book() {
             </div>
           </dl>
           <div className="flex flex-wrap gap-2 pt-2">
-            <Link to="/dashboard" className="btn-primary">
+            <Link to="/patient/dashboard" className="btn-primary">
               Back to dashboard
             </Link>
             <button

@@ -40,15 +40,37 @@ def get_database() -> AsyncIOMotorDatabase:
 
 async def ensure_indexes() -> None:
     """
-    Partial unique index on (date, slot) for status=booked.
-    Cancelling frees the slot while keeping the historical record.
+    Create/update all MongoDB indexes.
+    Old single-doctor index (date, slot) is replaced by the multi-tenant index
+    (hospital_id, doctor_id, date, slot) WHERE status="booked".
     """
     db = get_database()
+
+    # Users — unique email
+    await db.users.create_index("email", unique=True, name="uniq_user_email")
+
+    # Hospitals — unique name+city composite (advisory, non-blocking)
+    try:
+        await db.hospitals.create_index(
+            [("name", 1), ("city", 1)],
+            unique=True,
+            name="uniq_hospital_name_city",
+        )
+    except Exception:
+        pass  # Index may already exist from prior run
+
+    # Appointments — drop legacy single-doctor index if it exists, then create multi-tenant one
+    try:
+        await db.appointments.drop_index("uniq_booked_date_slot")
+        logger.info("Dropped legacy single-doctor appointment index")
+    except Exception:
+        pass  # Doesn't exist — that's fine
+
     await db.appointments.create_index(
-        [("date", 1), ("slot", 1)],
+        [("hospital_id", 1), ("doctor_id", 1), ("date", 1), ("slot", 1)],
         unique=True,
         partialFilterExpression={"status": "booked"},
-        name="uniq_booked_date_slot",
+        name="uniq_booked_hospital_doctor_date_slot",
     )
-    await db.users.create_index("email", unique=True, name="uniq_user_email")
-    logger.info("MongoDB indexes ensured (including partial unique booked date+slot)")
+
+    logger.info("MongoDB indexes ensured (multi-tenant appointment index active)")

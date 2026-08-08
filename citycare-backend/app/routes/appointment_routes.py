@@ -17,9 +17,13 @@ router = APIRouter(prefix="/appointments", tags=["Appointments"])
 
 
 @router.get("/free-slots", response_model=FreeSlotsResponse)
-async def free_slots(date: str = Query(..., description="ISO date YYYY-MM-DD")):
+async def free_slots(
+    date: str = Query(..., description="ISO date YYYY-MM-DD"),
+    doctor_id: str = Query(None),
+    hospital_id: str = Query(None),
+):
     """Return still-free slots for a date (menu minus booked). Open endpoint."""
-    return await appointment_controller.get_free_slots(date)
+    return await appointment_controller.get_free_slots(date, doctor_id=doctor_id, hospital_id=hospital_id)
 
 
 @router.post("", response_model=AppointmentOut, status_code=201)

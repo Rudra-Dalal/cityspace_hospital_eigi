@@ -17,6 +17,9 @@ class AppointmentCreate(BaseModel):
     reason: str = Field(..., min_length=1)
     temperature: Optional[float] = None
     symptoms: List[str] = Field(default_factory=list)
+    # Multi-tenant fields — optional for backward compat (controller resolves defaults)
+    hospital_id: Optional[str] = None
+    doctor_id: Optional[str] = None
 
     @field_validator("date")
     @classmethod
@@ -73,6 +76,8 @@ class AppointmentCreate(BaseModel):
 class AppointmentOut(BaseModel):
     id: str
     patient_id: str
+    hospital_id: Optional[str] = None
+    doctor_id: Optional[str] = None
     date: str
     slot: str
     reason: str

@@ -1,12 +1,11 @@
 """User database queries."""
 
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Optional
 
 from bson import ObjectId
 from bson.errors import InvalidId
 
 from app.core.database import get_database
-from app.models.user_model import UserRole
 
 
 async def create_user(document: Dict[str, Any]) -> Dict[str, Any]:
@@ -31,8 +30,9 @@ async def get_user_by_id(user_id: str) -> Optional[Dict[str, Any]]:
 
 
 async def count_patients() -> int:
+    """Count users with customer or legacy patient role."""
     db = get_database()
-    return await db.users.count_documents({"role": UserRole.PATIENT.value})
+    return await db.users.count_documents({"role": {"$in": ["customer", "patient"]}})
 
 
 async def get_users_by_ids(user_ids: list) -> Dict[str, Dict[str, Any]]:
@@ -51,3 +51,29 @@ async def get_users_by_ids(user_ids: list) -> Dict[str, Dict[str, Any]]:
     async for user in cursor:
         mapping[str(user["_id"])] = user
     return mapping
+
+
+async def list_users(
+    role: Optional[str] = None,
+    hospital_id: Optional[str] = None,
+) -> List[Dict[str, Any]]:
+    """List users with optional role and hospital_id filters."""
+    db = get_database()
+    query: Dict[str, Any] = {}
+    if role:
+        query["role"] = role
+    if hospital_id:
+        query["hospital_id"] = hospital_id
+    cursor = db.users.find(query).sort("created_at", -1)
+    return [u async for u in cursor]
+
+
+async def update_user(user_id: str, updates: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+    """Patch a user document and return the updated doc."""
+    db = get_database()
+    try:
+        oid = ObjectId(user_id)
+    except InvalidId:
+        return None
+    await db.users.update_one({"_id": oid}, {"$set": updates})
+    return await db.users.find_one({"_id": oid})

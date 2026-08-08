@@ -6,8 +6,10 @@ from typing import Any, Dict, Optional
 
 
 class UserRole(str, Enum):
-    PATIENT = "patient"
+    SUPER_ADMIN = "super_admin"
+    HOSPITAL_MANAGER = "hospital_manager"
     DOCTOR = "doctor"
+    CUSTOMER = "customer"   # renamed from "patient"
 
 
 def user_document(
@@ -17,19 +19,22 @@ def user_document(
     email: str,
     mobile: str,
     password_hash: str,
-    role: UserRole = UserRole.PATIENT,
+    role: UserRole = UserRole.CUSTOMER,
+    hospital_id: Optional[str] = None,
 ) -> Dict[str, Any]:
     now = datetime.now(timezone.utc)
-    return {
+    doc: Dict[str, Any] = {
         "first_name": first_name.strip(),
         "last_name": last_name.strip(),
         "email": email.lower().strip(),
         "mobile": mobile.strip(),
         "password_hash": password_hash,
         "role": role.value,
+        "hospital_id": hospital_id,  # None for customer / super_admin
         "created_at": now,
         "updated_at": now,
     }
+    return doc
 
 
 def serialize_user(doc: Dict[str, Any]) -> Dict[str, Any]:
@@ -41,5 +46,6 @@ def serialize_user(doc: Dict[str, Any]) -> Dict[str, Any]:
         "email": doc["email"],
         "mobile": doc.get("mobile", ""),
         "role": doc["role"],
+        "hospital_id": doc.get("hospital_id"),
         "created_at": doc.get("created_at"),
     }

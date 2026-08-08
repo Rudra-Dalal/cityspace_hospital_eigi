@@ -92,15 +92,45 @@ async function request(path, { method = 'GET', body, token, authRedirect = true 
 }
 
 export const api = {
+  // Auth
   signup: (payload) => request('/auth/signup', { method: 'POST', body: payload, authRedirect: false }),
-  login: (payload) => request('/auth/login', { method: 'POST', body: payload, authRedirect: false }),
-  doctorInfo: () => request('/doctor/info', { authRedirect: false }),
-  freeSlots: (date) => request(`/appointments/free-slots?date=${encodeURIComponent(date)}`, { authRedirect: false }),
-  book: (payload) => request('/appointments', { method: 'POST', body: payload }),
-  myAppointments: () => request('/appointments/my'),
+  login:  (payload) => request('/auth/login',  { method: 'POST', body: payload, authRedirect: false }),
+
+  // Doctor / clinic info
+  doctorInfo:     ()     => request('/doctor/info',  { authRedirect: false }),
   doctorSchedule: (date) => request(`/doctor/schedule?date=${encodeURIComponent(date)}`),
-  doctorStats: () => request('/doctor/stats'),
-  cancel: (id) => request(`/appointments/${id}/cancel`, { method: 'PATCH' }),
+  doctorStats:    ()     => request('/doctor/stats'),
+
+  // Appointments (customer)
+  freeSlots:      (date, doctorId, hospitalId) => {
+    const params = new URLSearchParams({ date })
+    if (doctorId)   params.set('doctor_id',   doctorId)
+    if (hospitalId) params.set('hospital_id', hospitalId)
+    return request(`/appointments/free-slots?${params}`, { authRedirect: false })
+  },
+  book:            (payload) => request('/appointments',           { method: 'POST', body: payload }),
+  myAppointments:  ()        => request('/appointments/my'),
+  cancel:          (id)      => request(`/appointments/${id}/cancel`, { method: 'PATCH' }),
+
+  // Super Admin — hospitals
+  adminListHospitals:   (status)  => request(`/admin/hospitals${status ? `?status=${status}` : ''}`),
+  adminCreateHospital:  (payload) => request('/admin/hospitals',        { method: 'POST',  body: payload }),
+  adminUpdateHospital:  (id, payload) => request(`/admin/hospitals/${id}`, { method: 'PATCH', body: payload }),
+
+  // Super Admin — users
+  adminListUsers:      (params = {}) => {
+    const q = new URLSearchParams(params).toString()
+    return request(`/admin/users${q ? `?${q}` : ''}`)
+  },
+  adminCreateManager:  (payload) => request('/admin/users/manager',      { method: 'POST',  body: payload }),
+  adminCreateDoctor:   (payload) => request('/admin/users/doctor',        { method: 'POST',  body: payload }),
+  adminDeactivateUser: (id)      => request(`/admin/users/${id}/deactivate`, { method: 'PATCH' }),
+
+  // Hospital Manager
+  managerHospital:       ()        => request('/manager/hospital'),
+  managerUpdateHospital: (payload) => request('/manager/hospital',      { method: 'PATCH', body: payload }),
+  managerDoctors:        ()        => request('/manager/doctors'),
+  managerAppointments:   ()        => request('/manager/appointments'),
 }
 
 export { ApiError, API_URL }

@@ -1,11 +1,11 @@
 """Doctor routes — clinic info (open) + schedule/stats (doctor-only)."""
 
-from typing import List
+from typing import Any, Dict, List
 
 from fastapi import APIRouter, Depends, Query
 
 from app.controllers import doctor_controller
-from app.core.security import require_doctor
+from app.core.security import get_current_user, require_role
 from app.schemas.appointment_schema import (
     DoctorInfoResponse,
     DoctorStatsResponse,
@@ -13,6 +13,8 @@ from app.schemas.appointment_schema import (
 )
 
 router = APIRouter(prefix="/doctor", tags=["Doctor"])
+
+_require_doctor = Depends(require_role("doctor", "hospital_manager", "super_admin"))
 
 
 @router.get("/info", response_model=DoctorInfoResponse)
@@ -24,13 +26,13 @@ async def doctor_info():
 @router.get("/schedule", response_model=List[ScheduleItem])
 async def doctor_schedule(
     date: str = Query(..., description="ISO date YYYY-MM-DD"),
-    _doctor=Depends(require_doctor),
+    current_user: Dict[str, Any] = _require_doctor,
 ):
-    """Full schedule for a date — doctor only. Patients receive 403."""
-    return await doctor_controller.get_schedule(date)
+    """Full schedule for a date — doctor/manager/admin only. Customers receive 403."""
+    return await doctor_controller.get_schedule(date, current_user)
 
 
 @router.get("/stats", response_model=DoctorStatsResponse)
-async def doctor_stats(_doctor=Depends(require_doctor)):
-    """Clinic statistics — doctor only."""
-    return await doctor_controller.get_stats()
+async def doctor_stats(current_user: Dict[str, Any] = _require_doctor):
+    """Clinic statistics — scoped to doctor's hospital."""
+    return await doctor_controller.get_stats(current_user)

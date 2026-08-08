@@ -50,7 +50,7 @@ class Settings(BaseSettings):
 
     cors_origins: str = "http://localhost:5173"
 
-    # Clinic facts (single-doctor clinic — configuration, not a collection)
+    # Clinic facts (used for seeding; once in DB they become the source of truth)
     doctor_display_name: str = "Dr. Meera Kulkarni"
     doctor_qualification: str = "MBBS, MD - General Physician"
     clinic_name: str = "CityCare Clinic"
@@ -65,6 +65,12 @@ class Settings(BaseSettings):
     doctor_last_name: str = "Kulkarni"
     doctor_email: str = "doctor@citycare.clinic"
     doctor_password: str = "Doctor@123"
+
+    # Seeded super-admin account
+    super_admin_first_name: str = "Super"
+    super_admin_last_name: str = "Admin"
+    super_admin_email: str = "admin@citycare.clinic"
+    super_admin_password: str = "Admin@123"
 
     @property
     def cors_origins_list(self) -> List[str]:

@@ -1,7 +1,7 @@
-"""Password hashing and JWT helpers."""
+"""Password hashing, JWT helpers, and RBAC dependency factories."""
 
 from datetime import datetime, timedelta, timezone
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Optional
 
 from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
@@ -88,9 +88,47 @@ async def get_current_user(
     return user
 
 
-async def require_doctor(current_user: Dict[str, Any] = Depends(get_current_user)) -> Dict[str, Any]:
-    """Authorization — valid patient token on a doctor door → 403, not 401."""
-    if current_user.get("role") != "doctor":
+# ---------------------------------------------------------------------------
+# Generic RBAC factory
+# ---------------------------------------------------------------------------
+
+def require_role(*roles: str):
+    """Return a FastAPI dependency that allows only users with one of the given roles."""
+    async def dep(current_user: Dict[str, Any] = Depends(get_current_user)) -> Dict[str, Any]:
+        if current_user.get("role") not in roles:
+            logger.warning(
+                "Forbidden: user %s (role=%s) attempted action requiring %s",
+                current_user.get("email"),
+                current_user.get("role"),
+                roles,
+            )
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="You do not have permission to perform this action.",
+            )
+        return current_user
+    return dep
+
+
+# ---------------------------------------------------------------------------
+# Pre-built RBAC dependencies (use these in route definitions)
+# ---------------------------------------------------------------------------
+
+require_super_admin = Depends(require_role("super_admin"))
+require_manager_or_above = Depends(require_role("hospital_manager", "super_admin"))
+require_doctor = Depends(require_role("doctor", "hospital_manager", "super_admin"))
+require_customer = Depends(require_role("customer"))
+# Any authenticated user — no role restriction beyond authentication
+require_any_role = Depends(get_current_user)
+
+
+# ---------------------------------------------------------------------------
+# Legacy alias — keeps old doctor-only endpoints working unchanged
+# ---------------------------------------------------------------------------
+
+async def require_doctor_dep(current_user: Dict[str, Any] = Depends(get_current_user)) -> Dict[str, Any]:
+    """Alias kept for backward-compat with existing doctor routes."""
+    if current_user.get("role") not in ("doctor", "hospital_manager", "super_admin"):
         logger.warning(
             "Forbidden: user %s (role=%s) attempted doctor-only action",
             current_user.get("email"),
@@ -103,8 +141,8 @@ async def require_doctor(current_user: Dict[str, Any] = Depends(get_current_user
     return current_user
 
 
-async def require_patient(current_user: Dict[str, Any] = Depends(get_current_user)) -> Dict[str, Any]:
-    if current_user.get("role") != "patient":
+async def require_customer_dep(current_user: Dict[str, Any] = Depends(get_current_user)) -> Dict[str, Any]:
+    if current_user.get("role") not in ("customer", "patient"):  # accept legacy "patient" too
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="You do not have permission to perform this action.",

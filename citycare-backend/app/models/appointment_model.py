@@ -13,6 +13,8 @@ class AppointmentStatus(str, Enum):
 def appointment_document(
     *,
     patient_id: str,
+    hospital_id: str,
+    doctor_id: str,
     date: str,
     slot: str,
     reason: str,
@@ -22,6 +24,8 @@ def appointment_document(
     now = datetime.now(timezone.utc)
     return {
         "patient_id": patient_id,
+        "hospital_id": hospital_id,
+        "doctor_id": doctor_id,
         "date": date,
         "slot": slot,
         "reason": reason.strip(),
@@ -41,6 +45,8 @@ def serialize_appointment(
     payload = {
         "id": str(doc["_id"]),
         "patient_id": doc["patient_id"],
+        "hospital_id": doc.get("hospital_id"),
+        "doctor_id": doc.get("doctor_id"),
         "date": doc["date"],
         "slot": doc["slot"],
         "reason": doc["reason"],

@@ -15,7 +15,7 @@ class SignupRequest(BaseModel):
     email: EmailStr
     mobile: str = Field(..., description="Indian mobile with +91")
     password: str = Field(..., min_length=8, max_length=128)
-    # Even if a client sends role, signup ignores it and always creates a patient
+    # Even if a client sends role, signup ignores it and always creates a customer
     role: Optional[UserRole] = None
 
     @field_validator("first_name", "last_name")
@@ -48,6 +48,7 @@ class UserOut(BaseModel):
     email: EmailStr
     mobile: str
     role: UserRole
+    hospital_id: Optional[str] = None
     created_at: Optional[datetime] = None
 
 
@@ -55,3 +56,55 @@ class TokenResponse(BaseModel):
     access_token: str
     token_type: str = "bearer"
     user: UserOut
+
+
+# ---------------------------------------------------------------------------
+# Admin management schemas
+# ---------------------------------------------------------------------------
+
+class CreateManagerRequest(BaseModel):
+    """Super admin creates a hospital manager."""
+    first_name: str = Field(..., min_length=1, max_length=50)
+    last_name: str = Field(..., min_length=1, max_length=50)
+    email: EmailStr
+    mobile: str = Field(..., description="Indian mobile with +91")
+    password: str = Field(..., min_length=8, max_length=128)
+    hospital_id: str = Field(..., description="ObjectId of the hospital to assign")
+
+    @field_validator("first_name", "last_name")
+    @classmethod
+    def strip_names(cls, v: str) -> str:
+        return v.strip()
+
+    @field_validator("mobile")
+    @classmethod
+    def validate_mobile(cls, v: str) -> str:
+        v = v.strip()
+        if not re.fullmatch(r"\+91[6-9]\d{9}", v):
+            raise ValueError("mobile must match +91 followed by a 10-digit Indian number")
+        return v
+
+
+class CreateDoctorRequest(BaseModel):
+    """Super admin or hospital manager creates a doctor."""
+    first_name: str = Field(..., min_length=1, max_length=50)
+    last_name: str = Field(..., min_length=1, max_length=50)
+    email: EmailStr
+    mobile: str = Field(..., description="Indian mobile with +91")
+    password: str = Field(..., min_length=8, max_length=128)
+    hospital_id: str = Field(..., description="ObjectId of the hospital to assign")
+    qualification: Optional[str] = "MBBS"
+    specialization: Optional[str] = "General Physician"
+
+    @field_validator("first_name", "last_name")
+    @classmethod
+    def strip_names(cls, v: str) -> str:
+        return v.strip()
+
+    @field_validator("mobile")
+    @classmethod
+    def validate_mobile(cls, v: str) -> str:
+        v = v.strip()
+        if not re.fullmatch(r"\+91[6-9]\d{9}", v):
+            raise ValueError("mobile must match +91 followed by a 10-digit Indian number")
+        return v

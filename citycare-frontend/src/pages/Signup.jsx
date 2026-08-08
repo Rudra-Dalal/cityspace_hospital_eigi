@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { api, formatApiDetail, setStoredAuth } from '../api/client'
 import FormInput from '../components/FormInput'
+import { ROLE_HOME } from '../components/ProtectedRoute'
 
 const MOBILE_RE = /^\+91[6-9]\d{9}$/
 
@@ -54,7 +55,7 @@ export default function Signup() {
       })
       const data = await api.login({ email: form.email.trim(), password: form.password })
       setStoredAuth({ token: data.access_token, user: data.user })
-      navigate(data.user.role === 'doctor' ? '/doctor' : '/dashboard', { replace: true })
+      navigate(ROLE_HOME[data.user.role] ?? '/patient/dashboard', { replace: true })
     } catch (err) {
       setApiError(formatApiDetail(err.detail || err.message))
     } finally {
