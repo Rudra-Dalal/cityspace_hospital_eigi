@@ -60,7 +60,7 @@ On startup the API creates the doctor account from `.env` if missing:
 | Email | `doctor@citycare.clinic` |
 | Password | `Doctor@123` |
 
-Change `DOCTOR_EMAIL` / `DOCTOR_PASSWORD` in `.env` before first run if you want different credentials.
+Change the seeded doctor and super-admin credentials in `.env` before first run. For deployment, set `APP_ENV=production`, use a unique random `SECRET_KEY` of at least 32 characters, set strong non-default seeded-account passwords, and configure explicit HTTPS origins in `CORS_ORIGINS`. The application refuses unsafe placeholder secrets, default account passwords, and localhost/wildcard CORS settings when production mode is enabled.
 
 ## API endpoints
 

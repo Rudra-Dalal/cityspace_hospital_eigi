@@ -3,6 +3,7 @@
 from functools import lru_cache
 from typing import List
 
+from pydantic import model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -44,6 +45,7 @@ class Settings(BaseSettings):
     mongodb_uri: str = "mongodb://localhost:27017"
     mongodb_db_name: str = "citycare"
 
+    app_env: str = "development"
     secret_key: str = "change-me-to-a-long-random-string"
     algorithm: str = "HS256"
     access_token_expire_minutes: int = 60
@@ -86,6 +88,31 @@ class Settings(BaseSettings):
     cloudinary_api_key: str = ""
     cloudinary_api_secret: str = ""
     prescription_pdf_folder: str = "citycare/prescriptions"
+
+    @model_validator(mode="after")
+    def reject_unsafe_production_settings(self) -> "Settings":
+        """Prevent sample credentials and permissive browser access in production."""
+        if self.app_env.strip().lower() not in {"production", "prod"}:
+            return self
+
+        unsafe_secret_prefixes = ("change-me", "your-", "replace-with", "test-")
+        if len(self.secret_key) < 32 or self.secret_key.lower().startswith(unsafe_secret_prefixes):
+            raise ValueError("SECRET_KEY must be a unique, randomly generated value of at least 32 characters in production.")
+
+        default_passwords = {"Doctor@123", "Admin@123"}
+        if (
+            len(self.doctor_password) < 12
+            or len(self.super_admin_password) < 12
+            or self.doctor_password in default_passwords
+            or self.super_admin_password in default_passwords
+        ):
+            raise ValueError("Seeded account passwords must be strong, non-default values in production.")
+
+        origins = self.cors_origins_list
+        if not origins or "*" in origins or any("localhost" in origin.lower() for origin in origins):
+            raise ValueError("CORS_ORIGINS must list explicit non-localhost HTTPS origins in production.")
+
+        return self
 
     @property
     def cors_origins_list(self) -> List[str]:
