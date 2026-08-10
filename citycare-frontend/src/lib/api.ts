@@ -167,6 +167,23 @@ export const adminApi = {
     apiFetch<User>(`/admin/users/${id}/deactivate`, { method: "PATCH" }),
 };
 
+export type AIChatRequest = {
+  message: string;
+  conversation_id?: string | null;
+};
+
+export type AIChatResponse = {
+  reply: string;
+  conversation_id: string;
+  tool_calls_made: string[];
+};
+
+export const aiApi = {
+  chat: (body: AIChatRequest) =>
+    apiFetch<AIChatResponse>("/ai/chat", { method: "POST", body }),
+};
+
+
 /* ---------- helpers ---------- */
 
 export function asList<T>(payload: unknown): T[] {

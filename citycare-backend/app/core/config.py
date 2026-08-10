@@ -72,6 +72,16 @@ class Settings(BaseSettings):
     super_admin_email: str = "admin@citycare.clinic"
     super_admin_password: str = "Admin@123"
 
+    # -----------------------------------------------------------------------
+    # Gemini AI configuration — Doctor Assistant
+    # -----------------------------------------------------------------------
+    gemini_api_key: str = ""
+    gemini_model: str = "gemini-2.0-flash"
+    gemini_enabled: bool = True
+    gemini_timeout_seconds: int = 30
+    gemini_max_output_tokens: int = 2048
+    gemini_temperature: float = 0.2
+
     @property
     def cors_origins_list(self) -> List[str]:
         return [o.strip() for o in self.cors_origins.split(",") if o.strip()]

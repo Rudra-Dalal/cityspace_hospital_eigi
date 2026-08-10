@@ -14,6 +14,7 @@ import {
   StatusBadge,
 } from "@/components/ui-kit";
 import { formatDate, isToday, personName } from "@/lib/format";
+import { DoctorAIChat } from "@/components/ai/DoctorAIChat";
 
 export const Route = createFileRoute("/doctor/dashboard")({
   ssr: false,
@@ -174,6 +175,11 @@ function DoctorDashboard() {
             </dl>
           )}
         </Panel>
+      </div>
+
+      {/* AI Assistant */}
+      <div className="mt-6">
+        <DoctorAIChat />
       </div>
     </>
   );

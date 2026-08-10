@@ -1,9 +1,7 @@
 """Appointment routes."""
 
 from typing import List
-
 from fastapi import APIRouter, Depends, Query
-
 from app.controllers import appointment_controller
 from app.core.security import get_current_user
 from app.schemas.appointment_schema import (
