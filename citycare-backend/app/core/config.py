@@ -76,11 +76,16 @@ class Settings(BaseSettings):
     # Gemini AI configuration — Doctor Assistant
     # -----------------------------------------------------------------------
     gemini_api_key: str = ""
-    gemini_model: str = "gemini-2.0-flash"
+    gemini_model: str = "gemini-flash-latest"
     gemini_enabled: bool = True
     gemini_timeout_seconds: int = 30
     gemini_max_output_tokens: int = 2048
     gemini_temperature: float = 0.2
+
+    cloudinary_cloud_name: str = ""
+    cloudinary_api_key: str = ""
+    cloudinary_api_secret: str = ""
+    prescription_pdf_folder: str = "citycare/prescriptions"
 
     @property
     def cors_origins_list(self) -> List[str]:

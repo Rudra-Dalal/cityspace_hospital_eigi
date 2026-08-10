@@ -28,6 +28,12 @@ export type Appointment = {
   doctor?: Partial<User> | null;
 };
 
+export type Medicine = { name: string; dosage: string; frequency: string; duration: string; instructions: string };
+export type Prescription = {
+  id: string; patient_id: string; doctor_id: string; appointment_id: string; diagnosis: string;
+  medicines: Medicine[]; general_instructions: string; created_at?: string; pdf_url?: string | null; doctor_name?: string | null;
+};
+
 export type Hospital = {
   id: number | string;
   name: string;
@@ -136,6 +142,14 @@ export const appointmentsApi = {
   mine: () => apiFetch<Appointment[]>("/appointments/my"),
   cancel: (id: number | string) =>
     apiFetch<Appointment>(`/appointments/${id}/cancel`, { method: "PATCH" }),
+  accept: (id: number | string) => apiFetch<Appointment>(`/appointments/${id}/accept`, { method: "PATCH" }),
+};
+
+export const prescriptionsApi = {
+  create: (body: { appointment_id: string; diagnosis: string; medicines: Medicine[]; general_instructions: string }) =>
+    apiFetch<Prescription>("/prescriptions", { method: "POST", body }),
+  get: (id: string) => apiFetch<Prescription>(`/prescriptions/${id}`),
+  mine: () => apiFetch<Prescription[]>("/prescriptions/my"),
 };
 
 export const doctorApi = {
@@ -181,6 +195,10 @@ export type AIChatResponse = {
 export const aiApi = {
   chat: (body: AIChatRequest) =>
     apiFetch<AIChatResponse>("/ai/chat", { method: "POST", body }),
+};
+
+export const patientAiApi = {
+  chat: (body: { message: string }) => apiFetch<{ reply: string; sources: string[] }>("/patient-ai/chat", { method: "POST", body }),
 };
 
 

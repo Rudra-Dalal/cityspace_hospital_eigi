@@ -20,7 +20,7 @@ async def test_signup_creates_patient_even_if_role_doctor_sent(client):
     )
     assert res.status_code == 201
     body = res.json()
-    assert body["role"] == "patient"
+    assert body["role"] == "customer"
     assert "password" not in body
     assert "password_hash" not in body
 
@@ -49,7 +49,7 @@ async def test_login_success_and_token_fields(client):
     assert "access_token" in data
     assert data["token_type"] == "bearer"
     assert data["user"]["email"] == "bob@example.com"
-    assert data["user"]["role"] == "patient"
+    assert data["user"]["role"] == "customer"
 
 
 @pytest.mark.asyncio

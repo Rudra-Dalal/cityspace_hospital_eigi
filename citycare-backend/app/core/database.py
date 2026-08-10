@@ -72,5 +72,8 @@ async def ensure_indexes() -> None:
         partialFilterExpression={"status": "booked"},
         name="uniq_booked_hospital_doctor_date_slot",
     )
+    await db.prescriptions.create_index("appointment_id", unique=True, name="uniq_prescription_appointment")
+    await db.prescriptions.create_index([("patient_id", 1), ("created_at", -1)], name="prescription_patient_recent")
+    await db.prescription_vectors.create_index([("patient_id", 1), ("prescription_id", 1)], name="prescription_vector_patient")
 
     logger.info("MongoDB indexes ensured (multi-tenant appointment index active)")

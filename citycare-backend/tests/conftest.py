@@ -20,6 +20,7 @@ os.environ.setdefault("DOCTOR_LAST_NAME", "Kulkarni")
 from app.core.config import get_settings
 from app.core.database import close_mongo_connection, connect_to_mongo, ensure_indexes, get_database
 from app.controllers.auth_controller import seed_doctor_if_missing
+from app.core.migrate import run_migrations
 from app.main import app
 
 get_settings.cache_clear()
@@ -39,7 +40,10 @@ async def client():
     db = get_database()
     await db.users.delete_many({})
     await db.appointments.delete_many({})
+    await db.prescriptions.delete_many({})
+    await db.prescription_vectors.delete_many({})
     await seed_doctor_if_missing()
+    await run_migrations()
 
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as ac:
@@ -47,6 +51,8 @@ async def client():
 
     await db.users.delete_many({})
     await db.appointments.delete_many({})
+    await db.prescriptions.delete_many({})
+    await db.prescription_vectors.delete_many({})
     await close_mongo_connection()
 
 

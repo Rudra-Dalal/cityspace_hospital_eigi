@@ -206,7 +206,7 @@ async def run_chat(
     if not api_key or api_key.startswith("your-"):
         raise RuntimeError("GEMINI_API_KEY is not configured.")
 
-    model_name: str = getattr(settings, "gemini_model", "gemini-2.0-flash")
+    model_name: str = getattr(settings, "gemini_model", "gemini-flash-latest")
     temperature: float = float(getattr(settings, "gemini_temperature", 0.2))
     max_output_tokens: int = int(getattr(settings, "gemini_max_output_tokens", 2048))
 
@@ -263,11 +263,17 @@ async def run_chat(
 
     # Agentic loop — Gemini may request multiple tool calls
     for _iteration in range(10):
-        response = await client.aio.models.generate_content(
-            model=model_name,
-            contents=contents,
-            config=generate_config,
-        )
+        try:
+            response = await client.aio.models.generate_content(
+                model=model_name,
+                contents=contents,
+                config=generate_config,
+            )
+        except Exception as exc:
+            err_msg = str(exc)
+            if "429" in err_msg or "RESOURCE_EXHAUSTED" in err_msg:
+                raise ValueError("rate_limited") from exc
+            raise
 
         candidate = response.candidates[0] if response.candidates else None
         if not candidate:

@@ -11,7 +11,7 @@ from app.core.config import get_settings
 from app.core.database import close_mongo_connection, connect_to_mongo, ensure_indexes
 from app.core.migrate import run_migrations
 from app.routes import appointment_routes, auth_routes, doctor_routes
-from app.routes import admin_routes, manager_routes, ai_routes
+from app.routes import admin_routes, manager_routes, ai_routes, prescription_routes, patient_ai_routes
 from app.utils.logger import get_logger
 
 logger = get_logger(__name__)
@@ -64,6 +64,8 @@ app.include_router(appointment_routes.router)
 app.include_router(admin_routes.router)
 app.include_router(manager_routes.router)
 app.include_router(ai_routes.router)
+app.include_router(prescription_routes.router)
+app.include_router(patient_ai_routes.router)
 
 
 @app.get("/health", tags=["Health"])

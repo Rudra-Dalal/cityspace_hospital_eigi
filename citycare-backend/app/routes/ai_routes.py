@@ -4,6 +4,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from typing import Any, Dict
 
 from app.ai.schemas import AIChatRequest, AIChatResponse
+from app.ai.service import run_chat
 from app.ai.tools import TOOL_LABELS
 from app.core.security import require_doctor_dep
 from app.utils.logger import get_logger
@@ -27,8 +28,6 @@ async def ai_chat(
     - Gemini is called only from this backend; the API key never reaches the browser.
     - All tools are read-only; no data mutations are possible.
     """
-    from app.ai.service import run_chat
-
     try:
         reply, conv_id, tools_called = await run_chat(
             message=payload.message,

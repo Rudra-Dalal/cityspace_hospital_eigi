@@ -7,6 +7,7 @@ from typing import Any, Dict, List, Optional
 
 class AppointmentStatus(str, Enum):
     BOOKED = "booked"
+    ACCEPTED = "accepted"
     CANCELLED = "cancelled"
 
 

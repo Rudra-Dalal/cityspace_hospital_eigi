@@ -126,3 +126,9 @@ class CancelResponse(BaseModel):
     id: str
     status: AppointmentStatus
     detail: str = "Appointment cancelled successfully."
+
+
+class AcceptResponse(BaseModel):
+    id: str
+    status: AppointmentStatus
+    detail: str = "Appointment accepted successfully."

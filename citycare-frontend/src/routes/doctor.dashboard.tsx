@@ -1,7 +1,11 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { CalendarCheck, CalendarDays, Clock, Mail, Phone, Users } from "lucide-react";
-import { asList, doctorApi, type Appointment } from "@/lib/api";
+import { appointmentsApi, asList, doctorApi, type Appointment } from "@/lib/api";
+import { Button } from "@/components/ui/button";
+import { PrescriptionForm } from "@/components/prescriptions/PrescriptionForm";
+import { toast } from "sonner";
+import { useState } from "react";
 import { useAuth } from "@/lib/auth";
 import { RoleGate } from "@/components/RoleGate";
 import {
@@ -36,6 +40,8 @@ export const Route = createFileRoute("/doctor/dashboard")({
 
 function DoctorDashboard() {
   const { user } = useAuth();
+  const queryClient = useQueryClient();
+  const [prescribing, setPrescribing] = useState<string | null>(null);
 
   const info = useQuery({ queryKey: ["doctor", "info"], queryFn: () => doctorApi.info() });
   const stats = useQuery({ queryKey: ["doctor", "stats"], queryFn: () => doctorApi.stats() });
@@ -45,6 +51,7 @@ function DoctorDashboard() {
   });
 
   const appointments = schedule.data ?? [];
+  const accept = useMutation({ mutationFn: (id: string | number) => appointmentsApi.accept(id), onSuccess: () => { toast.success("Appointment accepted"); queryClient.invalidateQueries({ queryKey: ["doctor", "schedule"] }); }, onError: (e) => toast.error(e instanceof Error ? e.message : "Could not accept appointment") });
   const today = appointments.filter((a) => isToday(a.date));
   const upcoming = appointments.filter((a) => !isToday(a.date));
   const statsData = stats.data;
@@ -93,7 +100,7 @@ function DoctorDashboard() {
             ) : today.length === 0 ? (
               <EmptyState title="Nothing on today" description="Enjoy the quiet clinic." />
             ) : (
-              <Timeline items={today} />
+              <Timeline items={today} accepting={accept.isPending} onAccept={(id) => accept.mutate(id)} prescribing={prescribing} setPrescribing={setPrescribing} refresh={() => queryClient.invalidateQueries({ queryKey: ["doctor", "schedule"] })} />
             )}
           </Panel>
 
@@ -185,7 +192,7 @@ function DoctorDashboard() {
   );
 }
 
-function Timeline({ items }: { items: Appointment[] }) {
+function Timeline({ items, onAccept, accepting, prescribing, setPrescribing, refresh }: { items: Appointment[]; onAccept: (id: string | number) => void; accepting: boolean; prescribing: string | null; setPrescribing: (id: string | null) => void; refresh: () => void }) {
   return (
     <ol className="relative space-y-4 border-l border-border pl-6">
       {items.map((appointment) => (
@@ -216,6 +223,8 @@ function Timeline({ items }: { items: Appointment[] }) {
                 ))}
               </div>
             ) : null}
+            {appointment.status === "booked" ? <Button className="mt-4" size="sm" disabled={accepting} onClick={() => onAccept(appointment.id)}>{accepting ? "Accepting…" : "Accept"}</Button> : null}
+            {appointment.status === "accepted" ? <div className="mt-4"><Button size="sm" variant="outline" onClick={() => setPrescribing(prescribing === String(appointment.id) ? null : String(appointment.id))}>Create Prescription</Button>{prescribing === String(appointment.id) ? <PrescriptionForm appointmentId={String(appointment.id)} onDone={() => { setPrescribing(null); refresh(); }} /> : null}</div> : null}
           </div>
         </li>
       ))}

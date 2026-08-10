@@ -154,3 +154,16 @@ async def cancel_appointment(appointment_id: str) -> Optional[Dict[str, Any]]:
         return_document=ReturnDocument.AFTER,
     )
     return result
+
+
+async def accept_appointment(appointment_id: str) -> Optional[Dict[str, Any]]:
+    db = get_database()
+    try:
+        oid = ObjectId(appointment_id)
+    except InvalidId:
+        return None
+    return await db.appointments.find_one_and_update(
+        {"_id": oid, "status": AppointmentStatus.BOOKED.value},
+        {"$set": {"status": AppointmentStatus.ACCEPTED.value, "updated_at": datetime.now(timezone.utc)}},
+        return_document=ReturnDocument.AFTER,
+    )

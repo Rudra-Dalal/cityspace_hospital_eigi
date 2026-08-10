@@ -14,7 +14,7 @@ from app.models.appointment_model import (
     appointment_document,
     serialize_appointment,
 )
-from app.schemas.appointment_schema import AppointmentCreate, AppointmentOut, CancelResponse
+from app.schemas.appointment_schema import AcceptResponse, AppointmentCreate, AppointmentOut, CancelResponse
 from app.utils.logger import get_logger
 
 logger = get_logger(__name__)
@@ -224,3 +224,21 @@ async def cancel_my_appointment(
         id=str(updated["_id"]),
         status=AppointmentStatus.CANCELLED,
     )
+
+
+async def accept_appointment(appointment_id: str, current_user: Dict[str, Any]) -> AcceptResponse:
+    if current_user.get("role") != "doctor":
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Only the assigned doctor can accept an appointment.")
+    appt = await appointment_crud.get_appointment_by_id(appointment_id)
+    if not appt:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Appointment not found.")
+    if appt.get("doctor_id") != str(current_user["_id"]):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="This appointment is assigned to another doctor.")
+    if appt.get("status") == AppointmentStatus.CANCELLED.value:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Cancelled appointments cannot be accepted.")
+    if appt.get("status") == AppointmentStatus.ACCEPTED.value:
+        return AcceptResponse(id=appointment_id, status=AppointmentStatus.ACCEPTED, detail="Appointment is already accepted.")
+    updated = await appointment_crud.accept_appointment(appointment_id)
+    if not updated:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Appointment status changed. Please refresh and try again.")
+    return AcceptResponse(id=str(updated["_id"]), status=AppointmentStatus.ACCEPTED)

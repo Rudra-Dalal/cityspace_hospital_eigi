@@ -7,6 +7,7 @@ from app.core.security import get_current_user
 from app.schemas.appointment_schema import (
     AppointmentCreate,
     AppointmentOut,
+    AcceptResponse,
     CancelResponse,
     FreeSlotsResponse,
 )
@@ -48,3 +49,9 @@ async def cancel_appointment(
     return await appointment_controller.cancel_my_appointment(
         appointment_id, current_user
     )
+
+
+@router.patch("/{appointment_id}/accept", response_model=AcceptResponse)
+async def accept_appointment(appointment_id: str, current_user=Depends(get_current_user)):
+    """Accept a booked appointment. Only its assigned doctor may do this."""
+    return await appointment_controller.accept_appointment(appointment_id, current_user)
