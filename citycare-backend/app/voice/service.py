@@ -95,4 +95,7 @@ CALLER QUESTION:
 
     except Exception as exc:
         logger.error("Error generating voice AI response: %s", exc)
-        return "I am having trouble looking that up right now. Please hold or call back shortly."
+        reply = "I am having trouble looking that up right now. Please hold or call back shortly."
+        history.append({"user": message, "assistant": reply})
+        return reply
+

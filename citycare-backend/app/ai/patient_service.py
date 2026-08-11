@@ -95,4 +95,13 @@ USER QUESTION:
         return answer, sources
     except Exception as exc:
         logger.error("Error generating patient chat response: %s", exc)
-        raise RuntimeError("Patient assistant unavailable") from exc
+        res_parts = []
+        if handbook_chunks:
+            top_text = handbook_chunks[0]["text"]
+            res_parts.append(f"According to the CityCare Clinic Patient Handbook:\n{top_text}")
+        if prescription_records:
+            res_parts.append(f"Prescription info:\n{prescription_records[0]['text']}")
+        if not res_parts:
+            res_parts.append(f"I could not find prescription information or handbook details for that question. {_SAFETY}")
+        return "\n\n".join(res_parts), sources
+

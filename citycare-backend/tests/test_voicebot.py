@@ -61,8 +61,19 @@ async def test_voice_chat_service_blocks_unauthenticated_patient_data():
 
 @pytest.mark.asyncio
 async def test_voice_websocket_route_exists(client: AsyncClient):
-    """Verify /voice/ws route is registered in FastAPI application."""
+    """Verify /voice/ws and /voice/incoming routes are registered in FastAPI application."""
     from app.main import app
-    paths = [getattr(r, "path", None) for r in app.routes if getattr(r, "path", None) is not None]
+
+    def _extract_paths(routes):
+        paths = []
+        for r in routes:
+            if hasattr(r, "path") and r.path:
+                paths.append(r.path)
+            if hasattr(r, "include_context") and hasattr(r.include_context, "included_router"):
+                paths.extend(_extract_paths(r.include_context.included_router.routes))
+        return paths
+
+    paths = _extract_paths(app.routes)
     assert "/voice/ws" in paths
     assert "/voice/incoming" in paths
+
