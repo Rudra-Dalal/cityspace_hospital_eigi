@@ -135,6 +135,74 @@ python scripts/ingest_handbook.py
 }
 ```
 
+## Telephony VoiceBot
+
+The real-time Telephony VoiceBot layer allows patients to call the CityCare phone number and receive spoken, grounded answers to general clinic questions via Twilio Media Streams, Pipecat, Deepgram STT, Gemini AI, and Sarvam TTS:
+
+```
+Phone
+ ↓
+Twilio
+ ↓
+Twilio Media Stream
+ ↓
+WebSocket (/voice/ws)
+ ↓
+Pipecat (Silero VAD)
+ ↓
+Deepgram STT
+ ↓
+CityCare AI + Handbook RAG
+ ↓
+Gemini (Grounded voice system prompt)
+ ↓
+Sarvam TTS
+ ↓
+WebSocket
+ ↓
+Twilio
+ ↓
+Phone Speaker
+```
+
+### Telephony Environment Variables (`.env`)
+```ini
+TWILIO_ACCOUNT_SID=your_account_sid
+TWILIO_AUTH_TOKEN=your_auth_token
+TWILIO_PHONE_NUMBER=+1234567890
+PUBLIC_BASE_URL=https://your-ngrok-subdomain.ngrok-free.app
+
+DEEPGRAM_API_KEY=your_deepgram_api_key
+SARVAM_API_KEY=your_sarvam_api_key
+```
+
+### Local Development & ngrok Setup
+1. **Start FastAPI Backend**:
+   ```bash
+   uvicorn app.main:app --reload --port 8000
+   ```
+
+2. **Expose Server via ngrok**:
+   ```bash
+   ngrok http 8000
+   ```
+
+3. **Configure `.env`**:
+   Set `PUBLIC_BASE_URL=https://<your-ngrok-subdomain>.ngrok-free.app`
+
+4. **Configure Twilio Voice Webhook**:
+   - Webhook URL: `https://<your-ngrok-subdomain>.ngrok-free.app/voice/incoming`
+   - HTTP Method: `POST`
+
+5. **WebSocket Stream URL**:
+   - `wss://<your-ngrok-subdomain>.ngrok-free.app/voice/ws`
+
+### Security Limitation
+- Incoming phone calls are **unauthenticated** by default.
+- General clinic queries (hours, fees, cancellation, services) are answered from the authoritative Handbook RAG.
+- Private patient prescription records will **never** be disclosed over phone calls without patient portal login.
+- *Note: MCP tool execution is not part of this initial voice phase.*
+
 ## Project layers
 
 ```

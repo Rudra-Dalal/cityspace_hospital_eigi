@@ -64,3 +64,7 @@ Doctors accept booked appointments before creating one prescription per accepted
 Patients retrieve only their own prescriptions at `GET /prescriptions/my`. The patient assistant at `POST /patient-ai/chat` retrieves records filtered by the JWT-authenticated patient ID before Gemini receives any context. It provides prescription information only and never changes medication instructions.
 
 See each folder’s README for endpoint tables, architecture notes, and viva prep.
+
+## Telephony VoiceBot
+
+The backend includes a real-time Telephony VoiceBot layer (`POST /voice/incoming` and `WS /voice/ws`) powered by Twilio Media Streams, Pipecat, Deepgram STT, Gemini AI, and Sarvam TTS. Phone calls retrieve grounded answers to general clinic questions from the Handbook RAG. See `citycare-backend/README.md` for full ngrok setup and Twilio configuration.
