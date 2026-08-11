@@ -94,6 +94,47 @@ pytest -v
 
 Includes a concurrency test that fires multiple simultaneous bookings for the same slot and asserts exactly one `201`.
 
+## Handbook RAG
+
+The patient chatbot (`POST /patient-ai/chat`) incorporates a Handbook RAG pipeline for general clinic questions alongside personal prescription RAG:
+
+```
+PDF (CityCare-Clinic-Patient-Handbook.pdf)
+ ↓
+Extraction (pypdf)
+ ↓
+Chunking (Section & Policy aware)
+ ↓
+Embeddings (Gemini gemini-embedding-001 with fallback)
+ ↓
+MongoDB (handbook_chunks collection)
+ ↓
+Vector Search / Cosine Similarity
+ ↓
+Chatbot (Combined context)
+ ↓
+Gemini (Grounded answer)
+```
+
+### Ingestion command
+```bash
+python scripts/ingest_handbook.py
+```
+
+### MongoDB Atlas Vector Search Index (Optional for Atlas deployments)
+```json
+{
+  "fields": [
+    {
+      "numDimensions": 3072,
+      "path": "embedding",
+      "similarity": "cosine",
+      "type": "vector"
+    }
+  ]
+}
+```
+
 ## Project layers
 
 ```

@@ -75,5 +75,10 @@ async def ensure_indexes() -> None:
     await db.prescriptions.create_index("appointment_id", unique=True, name="uniq_prescription_appointment")
     await db.prescriptions.create_index([("patient_id", 1), ("created_at", -1)], name="prescription_patient_recent")
     await db.prescription_vectors.create_index([("patient_id", 1), ("prescription_id", 1)], name="prescription_vector_patient")
+    await db.handbook_chunks.create_index(
+        [("document", 1), ("version", 1), ("chunk_index", 1)],
+        unique=True,
+        name="uniq_handbook_doc_version_chunk",
+    )
 
     logger.info("MongoDB indexes ensured (multi-tenant appointment index active)")
