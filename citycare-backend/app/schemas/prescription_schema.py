@@ -38,10 +38,20 @@ class MedicineOut(MedicineInput):
     pass
 
 
+class PrescriptionHospital(BaseModel):
+    id: str
+    name: str
+    address: Optional[str] = None
+    city: Optional[str] = None
+    state: Optional[str] = None
+    contact_phone: Optional[str] = None
+
+
 class PrescriptionOut(BaseModel):
     id: str
     patient_id: str
     doctor_id: str
+    hospital_id: Optional[str] = None
     appointment_id: str
     diagnosis: str
     medicines: List[MedicineOut]
@@ -51,3 +61,5 @@ class PrescriptionOut(BaseModel):
     pdf_url: Optional[str] = None
     cloudinary_public_id: Optional[str] = None
     doctor_name: Optional[str] = None
+    patient_name: Optional[str] = None
+    hospital: Optional[PrescriptionHospital] = None

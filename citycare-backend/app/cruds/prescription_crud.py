@@ -23,6 +23,11 @@ async def get_for_patient(patient_id: str) -> List[Dict[str, Any]]:
     return [doc async for doc in cursor]
 
 
+async def get_for_doctor(doctor_id: str) -> List[Dict[str, Any]]:
+    cursor = get_database().prescriptions.find({"doctor_id": doctor_id}).sort("created_at", -1)
+    return [doc async for doc in cursor]
+
+
 async def add_vector_record(document: Dict[str, Any]) -> None:
     await get_database().prescription_vectors.update_one(
         {"prescription_id": document["prescription_id"], "patient_id": document["patient_id"]},

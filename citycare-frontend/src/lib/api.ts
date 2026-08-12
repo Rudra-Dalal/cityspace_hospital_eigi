@@ -29,9 +29,28 @@ export type Appointment = {
 };
 
 export type Medicine = { name: string; dosage: string; frequency: string; duration: string; instructions: string };
+export type PrescriptionHospital = {
+  id: string;
+  name: string;
+  address?: string | null;
+  city?: string | null;
+  state?: string | null;
+  contact_phone?: string | null;
+};
 export type Prescription = {
-  id: string; patient_id: string; doctor_id: string; appointment_id: string; diagnosis: string;
-  medicines: Medicine[]; general_instructions: string; created_at?: string; pdf_url?: string | null; doctor_name?: string | null;
+  id: string;
+  patient_id: string;
+  doctor_id: string;
+  hospital_id?: string | null;
+  appointment_id: string;
+  diagnosis: string;
+  medicines: Medicine[];
+  general_instructions: string;
+  created_at?: string;
+  pdf_url?: string | null;
+  doctor_name?: string | null;
+  patient_name?: string | null;
+  hospital?: PrescriptionHospital | null;
 };
 
 export type Hospital = {
@@ -115,6 +134,34 @@ export async function apiFetch<T>(
   return payload as T;
 }
 
+export async function apiDownload(path: string): Promise<{ blob: Blob; filename: string }> {
+  const headers: Record<string, string> = {};
+  const token = getStoredToken();
+  if (token) headers["Authorization"] = `Bearer ${token}`;
+
+  let response: Response;
+  try {
+    response = await fetch(`${API_BASE_URL}${path}`, { headers });
+  } catch {
+    throw new ApiError("Can't reach the CityCare server. Please try again.", 0);
+  }
+  if (!response.ok) {
+    let payload: unknown = null;
+    try {
+      payload = JSON.parse(await response.text());
+    } catch {
+      /* non-JSON error body */
+    }
+    throw new ApiError(
+      extractMessage(payload, `Download failed (${response.status})`),
+      response.status,
+    );
+  }
+  const disposition = response.headers.get("Content-Disposition") ?? "";
+  const match = /filename="?([^";]+)"?/.exec(disposition);
+  return { blob: await response.blob(), filename: match?.[1] ?? "prescription.pdf" };
+}
+
 /* ---------- Endpoints ---------- */
 
 export const authApi = {
@@ -150,6 +197,8 @@ export const prescriptionsApi = {
     apiFetch<Prescription>("/prescriptions", { method: "POST", body }),
   get: (id: string) => apiFetch<Prescription>(`/prescriptions/${id}`),
   mine: () => apiFetch<Prescription[]>("/prescriptions/my"),
+  byDoctor: () => apiFetch<Prescription[]>("/prescriptions/doctor"),
+  download: (id: string) => apiDownload(`/prescriptions/${id}/download`),
 };
 
 export const doctorApi = {

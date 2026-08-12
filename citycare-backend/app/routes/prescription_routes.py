@@ -14,6 +14,14 @@ async def create_prescription(payload: PrescriptionCreate, current_user: Dict[st
 async def my_prescriptions(current_user: Dict[str, Any] = Depends(get_current_user)):
     return await prescription_controller.mine(current_user)
 
+@router.get("/doctor", response_model=List[PrescriptionOut])
+async def doctor_prescriptions(current_user: Dict[str, Any] = Depends(get_current_user)):
+    return await prescription_controller.by_doctor(current_user)
+
 @router.get("/{prescription_id}", response_model=PrescriptionOut)
 async def get_prescription(prescription_id: str, current_user: Dict[str, Any] = Depends(get_current_user)):
     return await prescription_controller.get_one(prescription_id, current_user)
+
+@router.get("/{prescription_id}/download")
+async def download_prescription(prescription_id: str, current_user: Dict[str, Any] = Depends(get_current_user)):
+    return await prescription_controller.download(prescription_id, current_user)
