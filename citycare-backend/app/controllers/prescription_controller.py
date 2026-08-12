@@ -60,18 +60,22 @@ async def create(payload: PrescriptionCreate, current_user: Dict[str, Any]) -> P
     # Ownership always comes from the appointment, never from the request body.
     document = prescription_document(patient_id=appointment["patient_id"], doctor_id=str(current_user["_id"]), hospital_id=str(hospital["_id"]), appointment_id=payload.appointment_id, diagnosis=payload.diagnosis, medicines=[m.model_dump() for m in payload.medicines], general_instructions=payload.general_instructions)
     try:
-        # Generate/upload before persisting so a successful record always has a usable PDF URL.
-        pdf = generate_prescription_pdf(document, appointment, current_user, patient, hospital)
-        url, public_id = upload_prescription_pdf(pdf, payload.appointment_id)
-        document["pdf_url"], document["cloudinary_public_id"] = url, public_id
+        # Insert first so the unique appointment index rejects a duplicate before any PDF is written.
         created = await prescription_crud.create_prescription(document)
     except DuplicateKeyError:
         raise HTTPException(status_code=409, detail="A prescription already exists for this appointment.")
-    except RuntimeError as exc:
-        raise HTTPException(status_code=503, detail="Prescription PDF storage is temporarily unavailable.") from exc
-    except HTTPException:
-        raise
     except Exception as exc:
+        raise HTTPException(status_code=500, detail="Unable to create prescription.") from exc
+    try:
+        pdf = generate_prescription_pdf(created, appointment, current_user, patient, hospital)
+        url, public_id = upload_prescription_pdf(pdf, str(created["_id"]))
+        await prescription_crud.set_pdf(created["_id"], url, public_id)
+        created["pdf_url"], created["cloudinary_public_id"] = url, public_id
+    except Exception as exc:
+        # A prescription without its PDF is unusable, so release the appointment for a retry.
+        await prescription_crud.delete_prescription(created["_id"])
+        if isinstance(exc, RuntimeError):
+            raise HTTPException(status_code=503, detail="Prescription PDF storage is temporarily unavailable.") from exc
         raise HTTPException(status_code=500, detail="Unable to create prescription.") from exc
     try:
         await index_prescription(created, _doctor_name(current_user))

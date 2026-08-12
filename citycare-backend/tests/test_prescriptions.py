@@ -105,6 +105,29 @@ async def test_duplicate_prescription_returns_conflict(client):
     assert second.status_code == 409
 
 @pytest.mark.asyncio
+async def test_rejected_duplicate_never_touches_the_stored_pdf(client):
+    _, doctor, appointment, _ = await make_accepted_appointment(client)
+    with upload_patch() as upload:
+        await client.post("/prescriptions", json=prescription_body(appointment["id"]), headers=auth_header(doctor["access_token"]))
+        uploads_after_first = upload.call_count
+        duplicate = prescription_body(appointment["id"]) | {"diagnosis": "Duplicate attempt"}
+        second = await client.post("/prescriptions", json=duplicate, headers=auth_header(doctor["access_token"]))
+    assert second.status_code == 409
+    assert upload.call_count == uploads_after_first
+
+@pytest.mark.asyncio
+async def test_failed_pdf_upload_leaves_no_prescription_behind(client):
+    _, doctor, appointment, _ = await make_accepted_appointment(client)
+    header = auth_header(doctor["access_token"])
+    with patch("app.controllers.prescription_controller.upload_prescription_pdf", side_effect=RuntimeError("boom")):
+        failed = await client.post("/prescriptions", json=prescription_body(appointment["id"]), headers=header)
+    assert failed.status_code == 503
+    assert (await client.get("/prescriptions/doctor", headers=header)).json() == []
+    with upload_patch():
+        retried = await client.post("/prescriptions", json=prescription_body(appointment["id"]), headers=header)
+    assert retried.status_code == 201
+
+@pytest.mark.asyncio
 async def test_doctor_listing_returns_only_own_prescriptions(client):
     _, doctor, appointment, _ = await make_accepted_appointment(client)
     with upload_patch():
