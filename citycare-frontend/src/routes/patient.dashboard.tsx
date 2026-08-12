@@ -1,9 +1,12 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
+import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { CalendarDays, CalendarPlus, Clock, Thermometer } from "lucide-react";
 import { toast } from "sonner";
 import { appointmentsApi, asList, prescriptionsApi, type Appointment, type Prescription } from "@/lib/api";
 import { PatientPrescriptionChat } from "@/components/ai/PatientPrescriptionChat";
+import { PrescriptionDetails } from "@/components/prescriptions/PrescriptionDetails";
+import { PrescriptionDownloadButton } from "@/components/prescriptions/PrescriptionDownloadButton";
 import { useAuth } from "@/lib/auth";
 import { RoleGate } from "@/components/RoleGate";
 import { Button } from "@/components/ui/button";
@@ -112,11 +115,53 @@ function PatientDashboard() {
           </Panel>
         ) : null}
         <Panel title="My prescriptions" description="Your doctor-issued prescriptions and PDF downloads.">
-          {prescriptions.isLoading ? <LoadingRows rows={2} /> : prescriptions.isError ? <ErrorNote message={prescriptions.error instanceof Error ? prescriptions.error.message : "Could not load prescriptions"} /> : prescriptions.data?.length ? <div className="space-y-3">{prescriptions.data.map((prescription: Prescription) => <div key={prescription.id} className="flex flex-wrap items-center justify-between gap-3 rounded-xl bg-surface p-4"><div><p className="font-medium">{prescription.diagnosis}</p><p className="text-sm text-muted-foreground">{prescription.doctor_name ?? "Doctor"} · {formatDate(prescription.created_at)}</p></div>{prescription.pdf_url ? <div className="flex gap-2"><Button asChild size="sm" variant="outline"><a href={prescription.pdf_url} target="_blank" rel="noreferrer">View PDF</a></Button><Button asChild size="sm"><a href={prescription.pdf_url} download>Download PDF</a></Button></div> : null}</div>)}</div> : <EmptyState title="No prescriptions yet" description="Doctor-issued prescriptions will appear here." />}
+          {prescriptions.isLoading ? (
+            <LoadingRows rows={2} />
+          ) : prescriptions.isError ? (
+            <ErrorNote
+              message={
+                prescriptions.error instanceof Error
+                  ? prescriptions.error.message
+                  : "Could not load prescriptions"
+              }
+            />
+          ) : prescriptions.data?.length ? (
+            <div className="grid gap-4 sm:grid-cols-2">
+              {prescriptions.data.map((prescription: Prescription) => (
+                <PrescriptionCard key={prescription.id} prescription={prescription} />
+              ))}
+            </div>
+          ) : (
+            <EmptyState
+              title="No prescriptions yet"
+              description="Doctor-issued prescriptions will appear here."
+            />
+          )}
         </Panel>
         <PatientPrescriptionChat />
       </div>
     </>
+  );
+}
+
+function PrescriptionCard({ prescription }: { prescription: Prescription }) {
+  const [viewing, setViewing] = useState(false);
+  return (
+    <article className="hover-lift fade-rise rounded-2xl bg-surface p-5">
+      <p className="font-display text-lg leading-tight">{prescription.doctor_name ?? "Doctor"}</p>
+      <p className="mt-1 text-sm text-muted-foreground">
+        {prescription.hospital?.name ?? "CityCare"} ·{" "}
+        {formatDate(prescription.created_at?.slice(0, 10))}
+      </p>
+      <p className="mt-3 text-sm text-foreground/90">Diagnosis: {prescription.diagnosis}</p>
+      <div className="mt-4 flex flex-wrap gap-2">
+        <Button size="sm" variant="outline" onClick={() => setViewing(true)}>
+          View prescription
+        </Button>
+        <PrescriptionDownloadButton prescriptionId={prescription.id} />
+      </div>
+      <PrescriptionDetails prescription={prescription} open={viewing} onOpenChange={setViewing} />
+    </article>
   );
 }
 

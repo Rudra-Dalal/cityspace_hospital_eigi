@@ -1,5 +1,7 @@
 """Cloudinary upload boundary; credentials stay in environment settings."""
 
+import httpx
+
 from app.core.config import get_settings
 
 
@@ -15,3 +17,14 @@ def upload_prescription_pdf(pdf_bytes: bytes, prescription_id: str) -> tuple[str
         return result["secure_url"], result["public_id"]
     except Exception as exc:
         raise RuntimeError("Prescription PDF upload failed.") from exc
+
+
+async def fetch_prescription_pdf(pdf_url: str) -> bytes:
+    """Read stored PDF bytes back so downloads stay behind CityCare authorization."""
+    try:
+        async with httpx.AsyncClient(timeout=20.0, follow_redirects=True) as client:
+            response = await client.get(pdf_url)
+            response.raise_for_status()
+            return response.content
+    except Exception as exc:
+        raise RuntimeError("Prescription PDF download failed.") from exc

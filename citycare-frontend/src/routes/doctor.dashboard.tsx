@@ -1,9 +1,18 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { CalendarCheck, CalendarDays, Clock, Mail, Phone, Users } from "lucide-react";
-import { appointmentsApi, asList, doctorApi, type Appointment } from "@/lib/api";
+import {
+  appointmentsApi,
+  asList,
+  doctorApi,
+  prescriptionsApi,
+  type Appointment,
+  type Prescription,
+} from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { PrescriptionForm } from "@/components/prescriptions/PrescriptionForm";
+import { PrescriptionDetails } from "@/components/prescriptions/PrescriptionDetails";
+import { PrescriptionDownloadButton } from "@/components/prescriptions/PrescriptionDownloadButton";
 import { toast } from "sonner";
 import { useState } from "react";
 import { useAuth } from "@/lib/auth";
@@ -49,9 +58,17 @@ function DoctorDashboard() {
     queryKey: ["doctor", "schedule"],
     queryFn: async () => asList<Appointment>(await doctorApi.schedule()),
   });
+  const prescriptions = useQuery({
+    queryKey: ["prescriptions", "doctor"],
+    queryFn: () => prescriptionsApi.byDoctor(),
+  });
 
   const appointments = schedule.data ?? [];
   const accept = useMutation({ mutationFn: (id: string | number) => appointmentsApi.accept(id), onSuccess: () => { toast.success("Appointment accepted"); queryClient.invalidateQueries({ queryKey: ["doctor", "schedule"] }); }, onError: (e) => toast.error(e instanceof Error ? e.message : "Could not accept appointment") });
+  const refreshAfterPrescribing = () => {
+    queryClient.invalidateQueries({ queryKey: ["doctor", "schedule"] });
+    queryClient.invalidateQueries({ queryKey: ["prescriptions", "doctor"] });
+  };
   const today = appointments.filter((a) => isToday(a.date));
   const upcoming = appointments.filter((a) => !isToday(a.date));
   const statsData = stats.data;
@@ -100,7 +117,7 @@ function DoctorDashboard() {
             ) : today.length === 0 ? (
               <EmptyState title="Nothing on today" description="Enjoy the quiet clinic." />
             ) : (
-              <Timeline items={today} accepting={accept.isPending} onAccept={(id) => accept.mutate(id)} prescribing={prescribing} setPrescribing={setPrescribing} refresh={() => queryClient.invalidateQueries({ queryKey: ["doctor", "schedule"] })} />
+              <Timeline items={today} accepting={accept.isPending} onAccept={(id) => accept.mutate(id)} prescribing={prescribing} setPrescribing={setPrescribing} refresh={refreshAfterPrescribing} />
             )}
           </Panel>
 
@@ -140,6 +157,31 @@ function DoctorDashboard() {
                   </tbody>
                 </table>
               </div>
+            )}
+          </Panel>
+
+          <Panel title="Prescriptions issued" description="Prescriptions you created, newest first">
+            {prescriptions.isLoading ? (
+              <LoadingRows rows={2} />
+            ) : prescriptions.isError ? (
+              <ErrorNote
+                message={
+                  prescriptions.error instanceof Error
+                    ? prescriptions.error.message
+                    : "Could not load prescriptions"
+                }
+              />
+            ) : prescriptions.data?.length ? (
+              <div className="space-y-3">
+                {prescriptions.data.map((prescription) => (
+                  <PrescriptionRow key={prescription.id} prescription={prescription} />
+                ))}
+              </div>
+            ) : (
+              <EmptyState
+                title="No prescriptions yet"
+                description="Prescriptions you create for accepted appointments appear here."
+              />
             )}
           </Panel>
         </div>
@@ -192,6 +234,28 @@ function DoctorDashboard() {
   );
 }
 
+function PrescriptionRow({ prescription }: { prescription: Prescription }) {
+  const [viewing, setViewing] = useState(false);
+  return (
+    <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl bg-surface p-4">
+      <div className="min-w-0">
+        <p className="font-medium">{prescription.diagnosis}</p>
+        <p className="text-sm text-muted-foreground">
+          {prescription.patient_name ?? "Patient"} · {prescription.hospital?.name ?? "CityCare"} ·{" "}
+          {formatDate(prescription.created_at?.slice(0, 10))}
+        </p>
+      </div>
+      <div className="flex gap-2">
+        <Button size="sm" variant="outline" onClick={() => setViewing(true)}>
+          View prescription
+        </Button>
+        <PrescriptionDownloadButton prescriptionId={prescription.id} />
+      </div>
+      <PrescriptionDetails prescription={prescription} open={viewing} onOpenChange={setViewing} />
+    </div>
+  );
+}
+
 function Timeline({ items, onAccept, accepting, prescribing, setPrescribing, refresh }: { items: Appointment[]; onAccept: (id: string | number) => void; accepting: boolean; prescribing: string | null; setPrescribing: (id: string | null) => void; refresh: () => void }) {
   return (
     <ol className="relative space-y-4 border-l border-border pl-6">
@@ -224,7 +288,7 @@ function Timeline({ items, onAccept, accepting, prescribing, setPrescribing, ref
               </div>
             ) : null}
             {appointment.status === "booked" ? <Button className="mt-4" size="sm" disabled={accepting} onClick={() => onAccept(appointment.id)}>{accepting ? "Accepting…" : "Accept"}</Button> : null}
-            {appointment.status === "accepted" ? <div className="mt-4"><Button size="sm" variant="outline" onClick={() => setPrescribing(prescribing === String(appointment.id) ? null : String(appointment.id))}>Create Prescription</Button>{prescribing === String(appointment.id) ? <PrescriptionForm appointmentId={String(appointment.id)} onDone={() => { setPrescribing(null); refresh(); }} /> : null}</div> : null}
+            {appointment.status === "accepted" ? <div className="mt-4"><Button size="sm" variant="outline" onClick={() => setPrescribing(prescribing === String(appointment.id) ? null : String(appointment.id))}>{prescribing === String(appointment.id) ? "Close" : "Create Prescription"}</Button>{prescribing === String(appointment.id) ? <PrescriptionForm appointmentId={String(appointment.id)} patientName={appointment.patient_name ?? personName(appointment.customer, "Patient")} onDone={refresh} /> : null}</div> : null}
           </div>
         </li>
       ))}

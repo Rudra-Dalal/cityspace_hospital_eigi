@@ -61,7 +61,7 @@ pytest -v
 
 Doctors accept booked appointments before creating one prescription per accepted appointment. The backend generates a real PDF, then uploads it to Cloudinary. Configure `CLOUDINARY_CLOUD_NAME`, `CLOUDINARY_API_KEY`, and `CLOUDINARY_API_SECRET` in `citycare-backend/.env`.
 
-Patients retrieve only their own prescriptions at `GET /prescriptions/my`. The patient assistant at `POST /patient-ai/chat` retrieves records filtered by the JWT-authenticated patient ID before Gemini receives any context. It provides prescription information only and never changes medication instructions.
+The doctor only submits `appointment_id`, diagnosis, medicines, and general instructions; the patient, doctor, and hospital are derived from the appointment on the server. Patients retrieve only their own prescriptions at `GET /prescriptions/my`, doctors list what they issued at `GET /prescriptions/doctor`, and both download the stored PDF through the authorized `GET /prescriptions/{id}/download`. The patient assistant at `POST /patient-ai/chat` retrieves records filtered by the JWT-authenticated patient ID before Gemini receives any context. It provides prescription information only and never changes medication instructions.
 
 See each folder’s README for endpoint tables, architecture notes, and viva prep.
 

@@ -1,9 +1,11 @@
 """PDF generation and patient-isolated prescription retrieval coverage."""
 
 from datetime import datetime, timezone
+from io import BytesIO
 from unittest.mock import AsyncMock, patch
 
 import pytest
+from pypdf import PdfReader
 
 from app.services.prescription_pdf import generate_prescription_pdf
 from app.services.prescription_rag import index_prescription, retrieve_for_patient
@@ -28,6 +30,35 @@ def test_generated_prescription_is_a_valid_pdf():
 
     assert pdf.startswith(b"%PDF-")
     assert len(pdf) > 500
+
+
+def test_generated_prescription_contains_every_field():
+    prescription = {
+        "created_at": datetime.now(timezone.utc),
+        "diagnosis": "Seasonal viral fever",
+        "medicines": [
+            {"name": "Paracetamol", "dosage": "500 mg", "frequency": "Twice daily",
+             "duration": "3 days", "instructions": "After food"},
+            {"name": "Azithromycin", "dosage": "250 mg", "frequency": "Once daily",
+             "duration": "5 days", "instructions": "Before sleep"},
+        ],
+        "general_instructions": "Rest and drink fluids.",
+    }
+    pdf = generate_prescription_pdf(
+        prescription,
+        {"date": "2026-08-10", "slot": "10:00"},
+        {"first_name": "Meera", "last_name": "Kulkarni"},
+        {"first_name": "Patient", "last_name": "One"},
+        {"name": "CityCare Central Hospital", "address": "12 Ring Road", "city": "Nagpur",
+         "state": "Maharashtra", "contact_phone": "+919999999999", "contact_email": "care@citycare.clinic"},
+    )
+    text = "\n".join(page.extract_text() for page in PdfReader(BytesIO(pdf)).pages)
+
+    for expected in ("Patient One", "Dr. Meera Kulkarni", "CityCare Central Hospital", "Nagpur",
+                     "2026-08-10", "Seasonal viral fever", "Paracetamol", "Azithromycin",
+                     "500 mg", "Twice daily", "3 days", "After food", "Before sleep",
+                     "Rest and drink fluids."):
+        assert expected in text
 
 
 @pytest.mark.asyncio
