@@ -65,6 +65,8 @@ Patients retrieve only their own prescriptions at `GET /prescriptions/my`. The p
 
 See each folder’s README for endpoint tables, architecture notes, and viva prep.
 
+For the backend command-line interface, see the [CityCare CLI Guide](CLI_GUIDE.md).
+
 ## Telephony VoiceBot
 
 The backend includes a real-time Telephony VoiceBot layer (`POST /voice/incoming` and `WS /voice/ws`) powered by Twilio Media Streams, Pipecat, Deepgram STT, Gemini AI, and Sarvam TTS. Phone calls retrieve grounded answers to general clinic questions from the Handbook RAG. See `citycare-backend/README.md` for full ngrok setup and Twilio configuration.

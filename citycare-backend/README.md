@@ -203,6 +203,92 @@ SARVAM_API_KEY=your_sarvam_api_key
 - Private patient prescription records will **never** be disclosed over phone calls without patient portal login.
 - *Note: MCP tool execution is not part of this initial voice phase.*
 
+## CityCare CLI Interface
+
+A lightweight command-line interface built directly on top of the existing backend services and controllers. No HTTP server required — the CLI imports Python modules directly.
+
+### Setup
+
+The CLI runs from the `citycare-backend/` directory with the virtual environment activated:
+
+```bash
+# Windows PowerShell
+.\\venv\\Scripts\\Activate.ps1
+
+# macOS / Linux
+# source venv/bin/activate
+```
+
+### Commands
+
+| Command | Auth Required | Description |
+|---------|:------------:|-------------|
+| `health` | No | Check backend config and MongoDB connectivity |
+| `doctors` | No | List clinic info and registered doctors |
+| `appointments` | Yes | List your appointments (patients) or schedule (doctors/managers) |
+| `prescriptions` | Yes (patient only) | List your prescriptions |
+| `ask "<question>"` | Optional | Ask the CityCare AI a question |
+
+### Authentication
+
+Private commands (`appointments`, `prescriptions`) require a valid JWT token.  
+Pass it with `--token <JWT>` or export it as an environment variable:
+
+```bash
+# Option 1: --token flag
+python -m cli.main appointments --token eyJhbGci...
+
+# Option 2: environment variable (recommended for scripting)
+export CITYCARE_JWT_TOKEN=eyJhbGci...
+python -m cli.main appointments
+```
+
+### Usage Examples
+
+```bash
+# Health check
+python -m cli.main health
+python -m cli.main health --json
+
+# List clinic info and doctors
+python -m cli.main doctors
+python -m cli.main doctors --json
+
+# My appointments (patient)
+python -m cli.main appointments --token <JWT>
+python -m cli.main appointments --token <JWT> --json
+
+# Doctor / manager schedule
+python -m cli.main appointments --token <DOCTOR_JWT>
+
+# My prescriptions (patient only)
+python -m cli.main prescriptions --token <JWT>
+python -m cli.main prescriptions --token <JWT> --json
+
+# Ask the AI (no auth — handbook answers only)
+python -m cli.main ask "What are the consultation hours?"
+
+# Ask the AI (with auth — includes personal prescription context)
+python -m cli.main ask "What medicines was I prescribed?" --token <JWT>
+python -m cli.main ask "What are the fees?" --json
+```
+
+### Output Modes
+
+All commands support a `--json` flag for machine-readable output:
+- Without `--json` — pretty human-readable table/text format.
+- With `--json` — valid JSON to stdout, suitable for piping to `jq` or scripts.
+
+### Unauthenticated Access
+
+If `appointments` or `prescriptions` is called without a valid token, a clean message is returned and no data is exposed:
+
+```
+Authentication required to access patient appointments.
+```
+
+---
+
 ## Project layers
 
 ```
