@@ -1,9 +1,22 @@
 import { useMemo, useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Building2, Loader2, Plus, Search, UserPlus, Users } from "lucide-react";
+import {
+  Building2,
+  Loader2,
+  Plus,
+  Search,
+  UserPlus,
+  Users,
+  ShieldCheck,
+  Stethoscope,
+  Power,
+  Edit2,
+  CheckCircle2,
+  XCircle,
+} from "lucide-react";
 import { toast } from "sonner";
-import { ROLE_LABEL, adminApi, asList, type Hospital, type Role, type User } from "@/lib/api";
+import { ROLE_LABEL, adminApi, asList, type Hospital, type Role, type User as UserType } from "@/lib/api";
 import { RoleGate } from "@/components/RoleGate";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -69,7 +82,7 @@ function AdminDashboard() {
   });
   const users = useQuery({
     queryKey: ["admin", "users"],
-    queryFn: async () => asList<User>(await adminApi.users()),
+    queryFn: async () => asList<UserType>(await adminApi.users()),
   });
 
   const hospitalList = hospitals.data ?? [];
@@ -93,7 +106,7 @@ function AdminDashboard() {
   const deactivate = useMutation({
     mutationFn: (id: number | string) => adminApi.deactivateUser(id),
     onSuccess: () => {
-      toast.success("User deactivated");
+      toast.success("User account deactivated");
       invalidateUsers();
     },
     onError: (error) => toast.error(error instanceof Error ? error.message : "Could not deactivate user"),
@@ -123,104 +136,125 @@ function AdminDashboard() {
   }, [userList, userSearch, roleFilter]);
 
   return (
-    <>
+    <div className="space-y-8 max-w-7xl mx-auto pb-12">
       <PageHeader
-        eyebrow="Super admin"
-        title="Network administration"
-        description="Hospitals, managers, doctors and patient accounts across all of CityCare."
+        eyebrow="Network Oversight"
+        title="System Administration"
+        description="Comprehensive control over hospital branches, medical staff assignments, and user accounts across the CityCare network."
       />
 
+      {/* Network Metrics */}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <StatCard label="Hospitals" value={hospitalList.length} icon={<Building2 className="h-4 w-4" />} />
-        <StatCard label="Total users" value={userList.length} icon={<Users className="h-4 w-4" />} />
         <StatCard
-          label="Doctors"
-          value={userList.filter((u) => u.role === "doctor").length}
-          icon={<UserPlus className="h-4 w-4" />}
+          label="Hospital Branches"
+          value={hospitalList.length}
+          icon={<Building2 className="h-4 w-4" />}
+          hint="Active facilities"
         />
         <StatCard
-          label="Patients"
-          value={userList.filter((u) => u.role === "customer").length}
+          label="Registered Users"
+          value={userList.length}
           icon={<Users className="h-4 w-4" />}
+          hint="Across all roles"
+        />
+        <StatCard
+          label="Physicians"
+          value={userList.filter((u) => u.role === "doctor").length}
+          icon={<Stethoscope className="h-4 w-4" />}
+          hint="Active clinical staff"
+        />
+        <StatCard
+          label="Patient Accounts"
+          value={userList.filter((u) => u.role === "customer").length}
+          icon={<ShieldCheck className="h-4 w-4" />}
+          hint="Verified patients"
         />
       </div>
 
-      <Tabs defaultValue="hospitals" className="mt-8">
-        <TabsList className="mb-6 h-auto flex-wrap rounded-2xl bg-surface p-1.5">
-          <TabsTrigger value="hospitals" className="rounded-xl px-4 py-2 text-sm">
-            Hospitals
+      <Tabs defaultValue="hospitals" className="mt-8 space-y-6">
+        <TabsList className="h-auto flex-wrap rounded-2xl bg-secondary/60 p-1.5 border border-border/60">
+          <TabsTrigger value="hospitals" className="rounded-xl px-5 py-2 text-xs font-bold tap-feedback">
+            Hospitals ({hospitalList.length})
           </TabsTrigger>
-          <TabsTrigger value="users" className="rounded-xl px-4 py-2 text-sm">
-            Users
+          <TabsTrigger value="users" className="rounded-xl px-5 py-2 text-xs font-bold tap-feedback">
+            User Directory ({userList.length})
           </TabsTrigger>
         </TabsList>
 
-        <TabsContent value="hospitals">
+        {/* Hospitals Management Tab */}
+        <TabsContent value="hospitals" className="fade-rise">
           <Panel
-            title="Hospitals"
-            description={`${filteredHospitals.length} of ${hospitalList.length} shown`}
+            title="Hospital Branches"
+            description={`${filteredHospitals.length} of ${hospitalList.length} branch${hospitalList.length === 1 ? "" : "es"} displayed`}
             action={<HospitalDialog onDone={invalidateHospitals} />}
           >
             <div className="mb-5 max-w-sm">
               <SearchInput
                 id="hospital-search"
-                placeholder="Search by name, city or address"
+                placeholder="Filter by branch name, city, address…"
                 value={hospitalSearch}
                 onChange={setHospitalSearch}
               />
             </div>
 
             {hospitals.isLoading ? (
-              <LoadingRows />
+              <LoadingRows rows={4} />
             ) : hospitals.isError ? (
               <ErrorNote
                 message={hospitals.error instanceof Error ? hospitals.error.message : "Could not load hospitals"}
+                onRetry={() => hospitals.refetch()}
               />
             ) : filteredHospitals.length === 0 ? (
-              <EmptyState title="No hospitals found" description="Adjust your search or create a new hospital." />
+              <EmptyState
+                title="No hospitals found"
+                description="Adjust your search criteria or register a new branch."
+              />
             ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full min-w-[680px] text-sm">
-                  <thead>
-                    <tr className="text-left text-xs uppercase tracking-wider text-muted-foreground">
-                      <th className="pb-3 font-semibold">Hospital</th>
-                      <th className="pb-3 font-semibold">City</th>
-                      <th className="pb-3 font-semibold">Contact</th>
-                      <th className="pb-3 font-semibold">Status</th>
-                      <th className="pb-3 text-right font-semibold">Actions</th>
+              <div className="overflow-x-auto rounded-2xl border border-border/60">
+                <table className="w-full min-w-[700px] text-sm text-left">
+                  <thead className="bg-surface border-b border-border/60 text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
+                    <tr>
+                      <th className="py-3.5 px-4">Hospital Branch</th>
+                      <th className="py-3.5 px-4">City</th>
+                      <th className="py-3.5 px-4">Contact</th>
+                      <th className="py-3.5 px-4">Status</th>
+                      <th className="py-3.5 px-4 text-right">Actions</th>
                     </tr>
                   </thead>
-                  <tbody>
-                    {filteredHospitals.map((hospital) => (
-                      <tr key={hospital.id} className="border-t border-border/70 transition-colors hover:bg-surface">
-                        <td className="py-3.5 pr-4">
-                          <p className="font-medium">{hospital.name}</p>
-                          <p className="text-xs text-muted-foreground">{hospital.address ?? "—"}</p>
-                        </td>
-                        <td className="py-3.5 pr-4 text-muted-foreground">{hospital.city ?? "—"}</td>
-                        <td className="py-3.5 pr-4 text-muted-foreground">
-                          <p className="break-all">{hospital.contact_email ?? "—"}</p>
-                          <p>{hospital.contact_phone ?? "—"}</p>
-                        </td>
-                        <td className="py-3.5 pr-4">
-                          <StatusBadge status={hospitalStatus(hospital)} />
-                        </td>
-                        <td className="py-3.5">
-                          <div className="flex justify-end gap-2">
-                            <HospitalDialog hospital={hospital} onDone={invalidateHospitals} />
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              className="rounded-xl"
-                              disabled={toggleStatus.isPending}
-                              onClick={() => toggleStatus.mutate(hospital)}
-                            >
-                              {hospitalStatus(hospital).toLowerCase() === "active" ? "Deactivate" : "Activate"}
-                            </Button>
-                          </div>
-                        </td>
-                      </tr>
-                    ))}
+                  <tbody className="divide-y divide-border/50 bg-card">
+                    {filteredHospitals.map((hospital) => {
+                      const isActive = hospitalStatus(hospital).toLowerCase() === "active";
+                      return (
+                        <tr key={hospital.id} className="transition-colors hover:bg-surface/50">
+                          <td className="py-3.5 px-4">
+                            <p className="font-bold text-foreground">{hospital.name}</p>
+                            <p className="text-xs text-muted-foreground">{hospital.address ?? "—"}</p>
+                          </td>
+                          <td className="py-3.5 px-4 text-xs font-medium text-foreground">{hospital.city ?? "—"}</td>
+                          <td className="py-3.5 px-4 text-xs text-muted-foreground">
+                            <p className="break-all">{hospital.contact_email ?? "—"}</p>
+                            <p>{hospital.contact_phone ?? "—"}</p>
+                          </td>
+                          <td className="py-3.5 px-4 whitespace-nowrap">
+                            <StatusBadge status={hospitalStatus(hospital)} />
+                          </td>
+                          <td className="py-3.5 px-4 text-right">
+                            <div className="flex items-center justify-end gap-2">
+                              <HospitalDialog hospital={hospital} onDone={invalidateHospitals} />
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="rounded-xl text-xs font-semibold tap-feedback"
+                                disabled={toggleStatus.isPending}
+                                onClick={() => toggleStatus.mutate(hospital)}
+                              >
+                                {isActive ? "Deactivate" : "Activate"}
+                              </Button>
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
                   </tbody>
                 </table>
               </div>
@@ -228,10 +262,11 @@ function AdminDashboard() {
           </Panel>
         </TabsContent>
 
-        <TabsContent value="users">
+        {/* Users Management Tab */}
+        <TabsContent value="users" className="fade-rise">
           <Panel
-            title="Users"
-            description={`${filteredUsers.length} of ${userList.length} shown`}
+            title="User Directory"
+            description={`${filteredUsers.length} of ${userList.length} accounts displayed`}
             action={
               <div className="flex flex-wrap gap-2">
                 <StaffDialog kind="manager" hospitals={hospitalList} onDone={invalidateUsers} />
@@ -242,71 +277,74 @@ function AdminDashboard() {
             <div className="mb-5 grid gap-3 sm:grid-cols-[minmax(0,1fr)_auto]">
               <SearchInput
                 id="user-search"
-                placeholder="Search by name, email or mobile"
+                placeholder="Search by name, email, mobile phone…"
                 value={userSearch}
                 onChange={setUserSearch}
               />
               <Select value={roleFilter} onValueChange={(value) => setRoleFilter(value as "all" | Role)}>
-                <SelectTrigger className="h-11 w-full rounded-xl sm:w-48">
+                <SelectTrigger className="h-11 w-full rounded-xl sm:w-52 border-border bg-card text-xs font-semibold shadow-subtle">
                   <SelectValue placeholder="All roles" />
                 </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All roles</SelectItem>
+                <SelectContent className="rounded-xl">
+                  <SelectItem value="all">All Roles ({userList.length})</SelectItem>
                   <SelectItem value="customer">Patients</SelectItem>
-                  <SelectItem value="doctor">Doctors</SelectItem>
-                  <SelectItem value="hospital_manager">Hospital managers</SelectItem>
-                  <SelectItem value="super_admin">Super admins</SelectItem>
+                  <SelectItem value="doctor">Physicians</SelectItem>
+                  <SelectItem value="hospital_manager">Hospital Managers</SelectItem>
+                  <SelectItem value="super_admin">Super Administrators</SelectItem>
                 </SelectContent>
               </Select>
             </div>
 
             {users.isLoading ? (
-              <LoadingRows />
+              <LoadingRows rows={4} />
             ) : users.isError ? (
-              <ErrorNote message={users.error instanceof Error ? users.error.message : "Could not load users"} />
+              <ErrorNote
+                message={users.error instanceof Error ? users.error.message : "Could not load users"}
+                onRetry={() => users.refetch()}
+              />
             ) : filteredUsers.length === 0 ? (
-              <EmptyState title="No users found" description="Try a different search or role filter." />
+              <EmptyState title="No matching accounts" description="Adjust your search query or role filter." />
             ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full min-w-[720px] text-sm">
-                  <thead>
-                    <tr className="text-left text-xs uppercase tracking-wider text-muted-foreground">
-                      <th className="pb-3 font-semibold">Name</th>
-                      <th className="pb-3 font-semibold">Role</th>
-                      <th className="pb-3 font-semibold">Contact</th>
-                      <th className="pb-3 font-semibold">Hospital</th>
-                      <th className="pb-3 font-semibold">Status</th>
-                      <th className="pb-3 text-right font-semibold">Actions</th>
+              <div className="overflow-x-auto rounded-2xl border border-border/60">
+                <table className="w-full min-w-[740px] text-sm text-left">
+                  <thead className="bg-surface border-b border-border/60 text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
+                    <tr>
+                      <th className="py-3.5 px-4">Name</th>
+                      <th className="py-3.5 px-4">Role</th>
+                      <th className="py-3.5 px-4">Contact</th>
+                      <th className="py-3.5 px-4">Branch Affiliation</th>
+                      <th className="py-3.5 px-4">Status</th>
+                      <th className="py-3.5 px-4 text-right">Actions</th>
                     </tr>
                   </thead>
-                  <tbody>
-                    {filteredUsers.map((user) => (
-                      <tr key={user.id} className="border-t border-border/70 transition-colors hover:bg-surface">
-                        <td className="py-3.5 pr-4 font-medium">{personName(user)}</td>
-                        <td className="py-3.5 pr-4 text-muted-foreground">{ROLE_LABEL[user.role] ?? user.role}</td>
-                        <td className="py-3.5 pr-4 text-muted-foreground">
-                          <p className="break-all">{user.email}</p>
-                          <p>{user.mobile}</p>
+                  <tbody className="divide-y divide-border/50 bg-card">
+                    {filteredUsers.map((u) => (
+                      <tr key={u.id} className="transition-colors hover:bg-surface/50">
+                        <td className="py-3.5 px-4 font-bold text-foreground">{personName(u)}</td>
+                        <td className="py-3.5 px-4 text-xs font-medium text-muted-foreground">
+                          {ROLE_LABEL[u.role] ?? u.role}
                         </td>
-                        <td className="py-3.5 pr-4 text-muted-foreground">
-                          {hospitalList.find((h) => String(h.id) === String(user.hospital_id))?.name ??
-                            (user.hospital_id ? `#${user.hospital_id}` : "—")}
+                        <td className="py-3.5 px-4 text-xs text-muted-foreground">
+                          <p className="break-all">{u.email}</p>
+                          <p>{u.mobile}</p>
                         </td>
-                        <td className="py-3.5 pr-4">
-                          <StatusBadge status={user.is_active === false ? "inactive" : "active"} />
+                        <td className="py-3.5 px-4 text-xs font-medium text-foreground">
+                          {hospitalList.find((h) => String(h.id) === String(u.hospital_id))?.name ??
+                            (u.hospital_id ? `#${u.hospital_id}` : "—")}
                         </td>
-                        <td className="py-3.5">
-                          <div className="flex justify-end">
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              className="rounded-xl text-destructive hover:bg-destructive/10 hover:text-destructive"
-                              disabled={user.is_active === false || deactivate.isPending}
-                              onClick={() => deactivate.mutate(user.id)}
-                            >
-                              Deactivate
-                            </Button>
-                          </div>
+                        <td className="py-3.5 px-4 whitespace-nowrap">
+                          <StatusBadge status={u.is_active === false ? "inactive" : "active"} />
+                        </td>
+                        <td className="py-3.5 px-4 text-right">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="rounded-xl text-xs font-semibold text-destructive hover:bg-destructive/10 hover:text-destructive tap-feedback"
+                            disabled={u.is_active === false || deactivate.isPending}
+                            onClick={() => deactivate.mutate(u.id)}
+                          >
+                            Deactivate
+                          </Button>
                         </td>
                       </tr>
                     ))}
@@ -317,7 +355,7 @@ function AdminDashboard() {
           </Panel>
         </TabsContent>
       </Tabs>
-    </>
+    </div>
   );
 }
 
@@ -340,7 +378,7 @@ function SearchInput({
         placeholder={placeholder}
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        className={`${fieldInputClass} pl-10`}
+        className={`${fieldInputClass} pl-10 h-11 text-xs`}
       />
     </div>
   );
@@ -363,7 +401,7 @@ function HospitalDialog({ hospital, onDone }: { hospital?: Hospital; onDone: () 
     mutationFn: (body: Partial<Hospital>) =>
       editing && hospital ? adminApi.updateHospital(hospital.id, body) : adminApi.createHospital(body),
     onSuccess: () => {
-      toast.success(editing ? "Hospital updated" : "Hospital created");
+      toast.success(editing ? "Hospital branch updated" : "Hospital branch registered");
       setOpen(false);
       onDone();
     },
@@ -374,47 +412,49 @@ function HospitalDialog({ hospital, onDone }: { hospital?: Hospital; onDone: () 
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
         {editing ? (
-          <Button variant="ghost" size="sm" className="rounded-xl">
-            Edit
+          <Button variant="ghost" size="sm" className="rounded-xl text-xs font-semibold tap-feedback">
+            <Edit2 className="mr-1.5 h-3.5 w-3.5" /> Edit
           </Button>
         ) : (
-          <Button size="sm" className="rounded-xl">
-            <Plus className="mr-1.5 h-4 w-4" /> New hospital
+          <Button size="sm" className="rounded-xl font-bold shadow-soft tap-feedback">
+            <Plus className="mr-1.5 h-4 w-4" /> New Hospital Branch
           </Button>
         )}
       </DialogTrigger>
       <DialogContent className="rounded-2xl sm:max-w-lg">
         <DialogHeader>
-          <DialogTitle className="font-display text-xl">
-            {editing ? "Edit hospital" : "Create hospital"}
+          <DialogTitle className="font-display text-xl font-bold">
+            {editing ? "Edit Hospital Branch" : "Register Hospital Branch"}
           </DialogTitle>
         </DialogHeader>
         <form
-          className="grid gap-4 sm:grid-cols-2"
+          className="grid gap-4 sm:grid-cols-2 pt-2"
           onSubmit={(event) => {
             event.preventDefault();
             setError("");
             if (form.name.trim().length < 2) {
-              setError("Hospital name is required");
+              setError("Hospital branch name is required");
               return;
             }
             mutation.mutate(form);
           }}
         >
-          <Field id="h-name" label="Name" className="sm:col-span-2">
+          <Field id="h-name" label="Branch Name *" className="sm:col-span-2">
             <Input
               id="h-name"
               value={form.name}
               onChange={(e) => setForm((p) => ({ ...p, name: e.target.value }))}
               className={fieldInputClass}
+              required
             />
           </Field>
-          <Field id="h-city" label="City">
+          <Field id="h-city" label="City *">
             <Input
               id="h-city"
               value={form.city}
               onChange={(e) => setForm((p) => ({ ...p, city: e.target.value }))}
               className={fieldInputClass}
+              required
             />
           </Field>
           <Field id="h-state" label="State">
@@ -425,7 +465,7 @@ function HospitalDialog({ hospital, onDone }: { hospital?: Hospital; onDone: () 
               className={fieldInputClass}
             />
           </Field>
-          <Field id="h-phone" label="Phone">
+          <Field id="h-phone" label="Telephone">
             <Input
               id="h-phone"
               value={form.contact_phone}
@@ -433,15 +473,7 @@ function HospitalDialog({ hospital, onDone }: { hospital?: Hospital; onDone: () 
               className={fieldInputClass}
             />
           </Field>
-          <Field id="h-address" label="Address" className="sm:col-span-2">
-            <Input
-              id="h-address"
-              value={form.address}
-              onChange={(e) => setForm((p) => ({ ...p, address: e.target.value }))}
-              className={fieldInputClass}
-            />
-          </Field>
-          <Field id="h-email" label="Email" className="sm:col-span-2">
+          <Field id="h-email" label="Email Address">
             <Input
               id="h-email"
               type="email"
@@ -450,15 +482,23 @@ function HospitalDialog({ hospital, onDone }: { hospital?: Hospital; onDone: () 
               className={fieldInputClass}
             />
           </Field>
+          <Field id="h-address" label="Street Address" className="sm:col-span-2">
+            <Input
+              id="h-address"
+              value={form.address}
+              onChange={(e) => setForm((p) => ({ ...p, address: e.target.value }))}
+              className={fieldInputClass}
+            />
+          </Field>
           {error ? (
             <div className="sm:col-span-2">
               <ErrorNote message={error} />
             </div>
           ) : null}
-          <DialogFooter className="sm:col-span-2">
-            <Button type="submit" className="rounded-xl" disabled={mutation.isPending}>
+          <DialogFooter className="sm:col-span-2 pt-2">
+            <Button type="submit" className="rounded-xl font-bold shadow-soft tap-feedback" disabled={mutation.isPending}>
               {mutation.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-              {editing ? "Save changes" : "Create hospital"}
+              {editing ? "Save Changes" : "Register Branch"}
             </Button>
           </DialogFooter>
         </form>
@@ -491,7 +531,7 @@ function StaffDialog({
     mutationFn: (body: Record<string, unknown>) =>
       kind === "manager" ? adminApi.createManager(body) : adminApi.createDoctor(body),
     onSuccess: () => {
-      toast.success(kind === "manager" ? "Manager created" : "Doctor created");
+      toast.success(kind === "manager" ? "Hospital Manager created" : "Physician account created");
       setOpen(false);
       setForm({ first_name: "", last_name: "", email: "", mobile: "", password: "", hospital_id: "" });
       onDone();
@@ -502,18 +542,18 @@ function StaffDialog({
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button size="sm" variant={kind === "manager" ? "outline" : "default"} className="rounded-xl">
-          <UserPlus className="mr-1.5 h-4 w-4" /> New {kind}
+        <Button size="sm" variant={kind === "manager" ? "outline" : "default"} className="rounded-xl text-xs font-bold tap-feedback">
+          <UserPlus className="mr-1.5 h-3.5 w-3.5" /> New {kind === "manager" ? "Manager" : "Doctor"}
         </Button>
       </DialogTrigger>
       <DialogContent className="rounded-2xl sm:max-w-lg">
         <DialogHeader>
-          <DialogTitle className="font-display text-xl">
-            Create {kind === "manager" ? "hospital manager" : "doctor"}
+          <DialogTitle className="font-display text-xl font-bold">
+            Create {kind === "manager" ? "Hospital Manager" : "Specialist Physician"}
           </DialogTitle>
         </DialogHeader>
         <form
-          className="grid gap-4 sm:grid-cols-2"
+          className="grid gap-4 sm:grid-cols-2 pt-2"
           onSubmit={(event) => {
             event.preventDefault();
             setError("");
@@ -530,7 +570,7 @@ function StaffDialog({
               return;
             }
             if (!form.hospital_id) {
-              setError("Select a hospital");
+              setError("Select an assigned hospital branch");
               return;
             }
             mutation.mutate({
@@ -543,32 +583,35 @@ function StaffDialog({
             });
           }}
         >
-          <Field id={`${kind}-first`} label="First name">
+          <Field id={`${kind}-first`} label="First Name *">
             <Input
               id={`${kind}-first`}
               value={form.first_name}
               onChange={(e) => setForm((p) => ({ ...p, first_name: e.target.value }))}
               className={fieldInputClass}
+              required
             />
           </Field>
-          <Field id={`${kind}-last`} label="Last name">
+          <Field id={`${kind}-last`} label="Last Name *">
             <Input
               id={`${kind}-last`}
               value={form.last_name}
               onChange={(e) => setForm((p) => ({ ...p, last_name: e.target.value }))}
               className={fieldInputClass}
+              required
             />
           </Field>
-          <Field id={`${kind}-email`} label="Email" className="sm:col-span-2">
+          <Field id={`${kind}-email`} label="Email Address *" className="sm:col-span-2">
             <Input
               id={`${kind}-email`}
               type="email"
               value={form.email}
               onChange={(e) => setForm((p) => ({ ...p, email: e.target.value }))}
               className={fieldInputClass}
+              required
             />
           </Field>
-          <Field id={`${kind}-mobile`} label="Mobile">
+          <Field id={`${kind}-mobile`} label="Mobile Number">
             <Input
               id={`${kind}-mobile`}
               value={form.mobile}
@@ -576,28 +619,31 @@ function StaffDialog({
               className={fieldInputClass}
             />
           </Field>
-          <Field id={`${kind}-password`} label="Temporary password">
+          <Field id={`${kind}-password`} label="Temporary Password *">
             <Input
               id={`${kind}-password`}
               type="password"
               value={form.password}
               onChange={(e) => setForm((p) => ({ ...p, password: e.target.value }))}
               className={fieldInputClass}
+              required
             />
           </Field>
           <div className="space-y-1.5 sm:col-span-2">
-            <p className="text-sm font-medium">Hospital</p>
+            <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+              Assigned Hospital Branch *
+            </label>
             <Select
               value={form.hospital_id}
               onValueChange={(value) => setForm((p) => ({ ...p, hospital_id: value }))}
             >
-              <SelectTrigger className="h-11 rounded-xl">
-                <SelectValue placeholder="Select a hospital" />
+              <SelectTrigger className="h-11 rounded-xl border-border bg-background">
+                <SelectValue placeholder="Select hospital branch" />
               </SelectTrigger>
-              <SelectContent>
+              <SelectContent className="rounded-xl">
                 {hospitals.map((hospital) => (
                   <SelectItem key={hospital.id} value={String(hospital.id)}>
-                    {hospital.name}
+                    {hospital.name} ({hospital.city})
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -608,10 +654,10 @@ function StaffDialog({
               <ErrorNote message={error} />
             </div>
           ) : null}
-          <DialogFooter className="sm:col-span-2">
-            <Button type="submit" className="rounded-xl" disabled={mutation.isPending}>
+          <DialogFooter className="sm:col-span-2 pt-2">
+            <Button type="submit" className="rounded-xl font-bold shadow-soft tap-feedback" disabled={mutation.isPending}>
               {mutation.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-              Create {kind}
+              Create {kind === "manager" ? "Manager Account" : "Physician Account"}
             </Button>
           </DialogFooter>
         </form>

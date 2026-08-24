@@ -1,11 +1,24 @@
+import { useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { CalendarCheck, CalendarDays, Clock, Mail, Phone, Users } from "lucide-react";
+import {
+  CalendarCheck,
+  CalendarDays,
+  Clock,
+  Mail,
+  Phone,
+  Users,
+  CheckCircle2,
+  FileEdit,
+  Stethoscope,
+  Building2,
+  Thermometer,
+  User,
+} from "lucide-react";
+import { toast } from "sonner";
 import { appointmentsApi, asList, doctorApi, type Appointment } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { PrescriptionForm } from "@/components/prescriptions/PrescriptionForm";
-import { toast } from "sonner";
-import { useState } from "react";
 import { useAuth } from "@/lib/auth";
 import { RoleGate } from "@/components/RoleGate";
 import {
@@ -37,7 +50,6 @@ export const Route = createFileRoute("/doctor/dashboard")({
   ),
 });
 
-
 function DoctorDashboard() {
   const { user } = useAuth();
   const queryClient = useQueryClient();
@@ -51,183 +63,262 @@ function DoctorDashboard() {
   });
 
   const appointments = schedule.data ?? [];
-  const accept = useMutation({ mutationFn: (id: string | number) => appointmentsApi.accept(id), onSuccess: () => { toast.success("Appointment accepted"); queryClient.invalidateQueries({ queryKey: ["doctor", "schedule"] }); }, onError: (e) => toast.error(e instanceof Error ? e.message : "Could not accept appointment") });
+  const accept = useMutation({
+    mutationFn: (id: string | number) => appointmentsApi.accept(id),
+    onSuccess: () => {
+      toast.success("Appointment accepted");
+      queryClient.invalidateQueries({ queryKey: ["doctor", "schedule"] });
+    },
+    onError: (e) => toast.error(e instanceof Error ? e.message : "Could not accept appointment"),
+  });
+
   const today = appointments.filter((a) => isToday(a.date));
   const upcoming = appointments.filter((a) => !isToday(a.date));
   const statsData = stats.data;
   const profile = (info.data ?? {}) as Record<string, unknown>;
 
   return (
-    <>
+    <div className="space-y-8 max-w-7xl mx-auto pb-12">
       <PageHeader
-        eyebrow="Doctor"
+        eyebrow="Clinical Workspace"
         title={`Dr. ${personName(user, "Clinician")}`}
-        description="Your consulting schedule and patient volume across the CityCare network."
+        description="Review patient consultations, issue digital prescriptions, and query your AI schedule assistant."
       />
 
+      {/* Metric Stat Cards */}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <StatCard
-          label="Appointments today"
-          value={statsData ? (statsData["today_visits"] as number ?? today.length) : today.length}
+          label="Today's Consultations"
+          value={statsData ? ((statsData["today_visits"] as number) ?? today.length) : today.length}
           icon={<CalendarCheck className="h-4 w-4" />}
+          hint="Scheduled for today"
         />
         <StatCard
-          label="Upcoming"
-          value={statsData ? (statsData["upcoming_visits"] as number ?? upcoming.length) : upcoming.length}
+          label="Upcoming Visits"
+          value={statsData ? ((statsData["upcoming_visits"] as number) ?? upcoming.length) : upcoming.length}
           icon={<CalendarDays className="h-4 w-4" />}
+          hint="Next 7 days"
         />
         <StatCard
-          label="Total patients"
-          value={statsData ? (statsData["total_patients"] as number ?? "—") : "—"}
+          label="Total Consultations"
+          value={statsData ? ((statsData["total_patients"] as number) ?? appointments.length) : appointments.length}
           icon={<Users className="h-4 w-4" />}
+          hint="All time recorded"
         />
         <StatCard
-          label="Schedule items"
+          label="Weekly Total"
           value={appointments.length}
           icon={<Clock className="h-4 w-4" />}
+          hint="Active appointment volume"
         />
       </div>
 
-      <div className="mt-6 grid gap-6 lg:grid-cols-[1.4fr_0.6fr]">
-        <div className="space-y-6">
-          <Panel title="Today" description={formatDate(new Date().toISOString().slice(0, 10))}>
+      {/* Main Schedule & AI Grid */}
+      <div className="grid gap-8 lg:grid-cols-[1.4fr_0.6fr]">
+        <div className="space-y-8">
+          {/* Today's Queue */}
+          <Panel
+            title="Today's Consultation Queue"
+            description={formatDate(new Date().toISOString().slice(0, 10))}
+          >
             {schedule.isLoading ? (
-              <LoadingRows />
+              <LoadingRows rows={2} />
             ) : schedule.isError ? (
               <ErrorNote
                 message={schedule.error instanceof Error ? schedule.error.message : "Could not load schedule"}
+                onRetry={() => schedule.refetch()}
               />
             ) : today.length === 0 ? (
-              <EmptyState title="Nothing on today" description="Enjoy the quiet clinic." />
+              <EmptyState
+                title="No consultations today"
+                description="Your clinic queue for today is clear. Upcoming bookings will appear here."
+              />
             ) : (
-              <Timeline items={today} accepting={accept.isPending} onAccept={(id) => accept.mutate(id)} prescribing={prescribing} setPrescribing={setPrescribing} refresh={() => queryClient.invalidateQueries({ queryKey: ["doctor", "schedule"] })} />
-            )}
-          </Panel>
-
-          <Panel title="Coming up" description="The rest of your booked schedule">
-            {schedule.isLoading ? (
-              <LoadingRows rows={2} />
-            ) : upcoming.length === 0 ? (
-              <EmptyState title="No further appointments booked" />
-            ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full min-w-[520px] text-sm">
-                  <thead>
-                    <tr className="text-left text-xs uppercase tracking-wider text-muted-foreground">
-                      <th className="pb-3 font-semibold">Date</th>
-                      <th className="pb-3 font-semibold">Slot</th>
-                      <th className="pb-3 font-semibold">Patient</th>
-                      <th className="pb-3 font-semibold">Reason</th>
-                      <th className="pb-3 font-semibold">Status</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {upcoming.map((appointment) => (
-                      <tr key={appointment.id} className="border-t border-border/70 transition-colors hover:bg-surface">
-                        <td className="py-3.5 pr-4 font-medium">{formatDate(appointment.date)}</td>
-                        <td className="py-3.5 pr-4 text-muted-foreground">{appointment.slot}</td>
-                        <td className="py-3.5 pr-4">
-                          {appointment.patient_name ?? personName(appointment.customer)}
-                        </td>
-                        <td className="max-w-[220px] truncate py-3.5 pr-4 text-muted-foreground">
-                          {appointment.reason ?? "—"}
-                        </td>
-                        <td className="py-3.5">
-                          <StatusBadge status={appointment.status ?? "booked"} />
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </Panel>
-        </div>
-
-        <Panel title="Profile">
-          {info.isLoading ? (
-            <LoadingRows rows={2} />
-          ) : (
-            <dl className="space-y-4 text-sm">
-              <div>
-                <dt className="text-xs uppercase tracking-wider text-muted-foreground">Name</dt>
-                <dd className="mt-1 font-medium">{personName(user)}</dd>
-              </div>
-              <div>
-                <dt className="flex items-center gap-1.5 text-xs uppercase tracking-wider text-muted-foreground">
-                  <Mail className="h-3 w-3" /> Email
-                </dt>
-                <dd className="mt-1 break-all font-medium">{user?.email ?? "—"}</dd>
-              </div>
-              <div>
-                <dt className="flex items-center gap-1.5 text-xs uppercase tracking-wider text-muted-foreground">
-                  <Phone className="h-3 w-3" /> Mobile
-                </dt>
-                <dd className="mt-1 font-medium">{user?.mobile ?? "—"}</dd>
-              </div>
-              {Object.entries(profile)
-                .filter(
-                  ([key, value]) =>
-                    !["id", "first_name", "last_name", "email", "mobile", "role", "password"].includes(key) &&
-                    (typeof value === "string" || typeof value === "number"),
-                )
-                .map(([key, value]) => (
-                  <div key={key}>
-                    <dt className="text-xs uppercase tracking-wider text-muted-foreground">
-                      {key.replace(/_/g, " ")}
-                    </dt>
-                    <dd className="mt-1 font-medium">{String(value)}</dd>
+              <div className="space-y-4">
+                {today.map((appointment) => (
+                  <div key={appointment.id} className="space-y-3">
+                    <DoctorAppointmentItem
+                      appointment={appointment}
+                      onAccept={() => accept.mutate(appointment.id)}
+                      accepting={accept.isPending && accept.variables === appointment.id}
+                      onPrescribe={() =>
+                        setPrescribing((curr) => (curr === String(appointment.id) ? null : String(appointment.id)))
+                      }
+                      isPrescribing={prescribing === String(appointment.id)}
+                    />
+                    {prescribing === String(appointment.id) ? (
+                      <PrescriptionForm
+                        appointmentId={String(appointment.id)}
+                        onDone={() => setPrescribing(null)}
+                      />
+                    ) : null}
                   </div>
                 ))}
-            </dl>
-          )}
-        </Panel>
-      </div>
+              </div>
+            )}
+          </Panel>
 
-      {/* AI Assistant */}
-      <div className="mt-6">
-        <DoctorAIChat />
+          {/* Upcoming Schedule */}
+          {upcoming.length > 0 ? (
+            <Panel title="Upcoming Schedule" description="Bookings in the upcoming days">
+              <div className="space-y-3">
+                {upcoming.map((appointment) => (
+                  <DoctorAppointmentItem key={appointment.id} appointment={appointment} />
+                ))}
+              </div>
+            </Panel>
+          ) : null}
+        </div>
+
+        {/* Right Sidebar: Profile & AI Chat */}
+        <div className="space-y-6">
+          {/* Physician Profile Card */}
+          <Panel title="Physician Profile">
+            <div className="space-y-3 text-xs">
+              <div className="flex items-center gap-3 border-b border-border/50 pb-3">
+                <span className="grid h-10 w-10 place-items-center rounded-2xl bg-primary/10 text-sm font-bold text-primary">
+                  {user?.first_name?.[0]}
+                  {user?.last_name?.[0]}
+                </span>
+                <div>
+                  <p className="font-bold text-sm text-foreground">
+                    Dr. {user?.first_name} {user?.last_name}
+                  </p>
+                  <p className="text-primary font-semibold">
+                    {String(profile["specialization"] || user?.specialization || "General Medicine")}
+                  </p>
+                </div>
+              </div>
+
+              {profile["qualification"] || user?.qualification ? (
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Qualification:</span>
+                  <span className="font-medium text-foreground">{String(profile["qualification"] || user?.qualification)}</span>
+                </div>
+              ) : null}
+
+              {profile["working_hours"] || user?.working_hours ? (
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Hours:</span>
+                  <span className="font-medium text-foreground">{String(profile["working_hours"] || user?.working_hours)}</span>
+                </div>
+              ) : null}
+
+              {user?.email ? (
+                <div className="flex items-center gap-2 text-muted-foreground pt-1">
+                  <Mail className="h-3.5 w-3.5" />
+                  <span className="truncate">{user.email}</span>
+                </div>
+              ) : null}
+            </div>
+          </Panel>
+
+          {/* Clinical Assistant AI */}
+          <DoctorAIChat />
+        </div>
       </div>
-    </>
+    </div>
   );
 }
 
-function Timeline({ items, onAccept, accepting, prescribing, setPrescribing, refresh }: { items: Appointment[]; onAccept: (id: string | number) => void; accepting: boolean; prescribing: string | null; setPrescribing: (id: string | null) => void; refresh: () => void }) {
+function DoctorAppointmentItem({
+  appointment,
+  onAccept,
+  accepting,
+  onPrescribe,
+  isPrescribing,
+}: {
+  appointment: Appointment;
+  onAccept?: () => void;
+  accepting?: boolean;
+  onPrescribe?: () => void;
+  isPrescribing?: boolean;
+}) {
+  const isBooked = (appointment.status ?? "").toLowerCase() === "booked";
+  const isAccepted = (appointment.status ?? "").toLowerCase() === "accepted";
+  const patient = appointment.customer || {};
+  const patientName = appointment.patient_name || `${patient.first_name || ""} ${patient.last_name || ""}`.trim() || "Patient";
+  const symptoms = appointment.symptoms ?? [];
+
   return (
-    <ol className="relative space-y-4 border-l border-border pl-6">
-      {items.map((appointment) => (
-        <li key={appointment.id} className="fade-rise relative">
-          <span className="absolute -left-[31px] top-3 h-2.5 w-2.5 rounded-full bg-primary ring-4 ring-primary-soft" />
-          <div className="hover-lift rounded-2xl bg-surface p-4">
-            <div className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-3">
-              <div className="min-w-0">
-                <p className="font-display text-base leading-tight">{appointment.slot}</p>
-                <p className="mt-1 truncate text-sm text-muted-foreground">
-                  {appointment.patient_name ?? personName(appointment.customer, "Patient")}
-                </p>
-              </div>
-              <StatusBadge status={appointment.status ?? "booked"} />
+    <div className="rounded-2xl border border-border/70 bg-card p-5 shadow-subtle hover-lift flex flex-col justify-between space-y-4">
+      <div>
+        <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3">
+          <div className="min-w-0">
+            <div className="flex items-center gap-2">
+              <span className="grid h-7 w-7 place-items-center rounded-full bg-secondary text-foreground text-xs font-bold">
+                <User className="h-4 w-4 text-primary" />
+              </span>
+              <h4 className="font-display font-bold text-base text-foreground leading-tight">{patientName}</h4>
             </div>
-            {appointment.reason ? (
-              <p className="mt-3 text-sm text-foreground/90">{appointment.reason}</p>
-            ) : null}
-            {appointment.symptoms?.length ? (
-              <div className="mt-3 flex flex-wrap gap-2">
-                {appointment.symptoms.map((symptom) => (
-                  <span
-                    key={symptom}
-                    className="rounded-full bg-card px-2.5 py-1 text-xs font-medium capitalize text-muted-foreground"
-                  >
-                    {symptom}
-                  </span>
-                ))}
-              </div>
-            ) : null}
-            {appointment.status === "booked" ? <Button className="mt-4" size="sm" disabled={accepting} onClick={() => onAccept(appointment.id)}>{accepting ? "Accepting…" : "Accept"}</Button> : null}
-            {appointment.status === "accepted" ? <div className="mt-4"><Button size="sm" variant="outline" onClick={() => setPrescribing(prescribing === String(appointment.id) ? null : String(appointment.id))}>Create Prescription</Button>{prescribing === String(appointment.id) ? <PrescriptionForm appointmentId={String(appointment.id)} onDone={() => { setPrescribing(null); refresh(); }} /> : null}</div> : null}
+
+            <div className="mt-2 flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
+              <span className="flex items-center gap-1 font-semibold text-foreground">
+                <CalendarDays className="h-3.5 w-3.5 text-primary" />
+                {formatDate(appointment.date)}
+              </span>
+              <span className="flex items-center gap-1 font-semibold text-primary">
+                <Clock className="h-3.5 w-3.5" />
+                Slot: {appointment.slot}
+              </span>
+              {patient.mobile ? (
+                <span className="flex items-center gap-1">
+                  <Phone className="h-3.5 w-3.5" /> {patient.mobile}
+                </span>
+              ) : null}
+            </div>
           </div>
-        </li>
-      ))}
-    </ol>
+          <StatusBadge status={appointment.status} />
+        </div>
+
+        {appointment.reason ? (
+          <p className="mt-3 text-xs text-foreground/90 leading-relaxed bg-surface/70 rounded-xl p-3 border border-border/40">
+            <strong>Reason:</strong> {appointment.reason}
+          </p>
+        ) : null}
+
+        <div className="mt-3 flex flex-wrap items-center gap-1.5">
+          {appointment.temperature ? (
+            <span className="inline-flex items-center gap-1 rounded-full bg-secondary px-2.5 py-0.5 text-[11px] font-medium text-muted-foreground">
+              <Thermometer className="h-3 w-3 text-destructive" /> {appointment.temperature}°F
+            </span>
+          ) : null}
+          {symptoms.map((symptom) => (
+            <span
+              key={symptom}
+              className="rounded-full bg-secondary/80 px-2.5 py-0.5 text-[11px] font-medium capitalize text-muted-foreground"
+            >
+              {symptom}
+            </span>
+          ))}
+        </div>
+      </div>
+
+      <div className="flex flex-wrap items-center justify-end gap-2 border-t border-border/50 pt-3">
+        {onAccept && isBooked ? (
+          <Button
+            size="sm"
+            onClick={onAccept}
+            disabled={accepting}
+            className="rounded-xl text-xs font-semibold shadow-soft tap-feedback"
+          >
+            <CheckCircle2 className="mr-1.5 h-3.5 w-3.5" />
+            {accepting ? "Accepting…" : "Accept Consultation"}
+          </Button>
+        ) : null}
+
+        {onPrescribe ? (
+          <Button
+            size="sm"
+            variant={isPrescribing ? "secondary" : "outline"}
+            onClick={onPrescribe}
+            className="rounded-xl text-xs font-semibold tap-feedback"
+          >
+            <FileEdit className="mr-1.5 h-3.5 w-3.5" />
+            {isPrescribing ? "Close Prescription Form" : "Issue Prescription"}
+          </Button>
+        ) : null}
+      </div>
+    </div>
   );
 }
