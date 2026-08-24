@@ -89,6 +89,25 @@ class Settings(BaseSettings):
     cloudinary_api_secret: str = ""
     prescription_pdf_folder: str = "citycare/prescriptions"
 
+    # -----------------------------------------------------------------------
+    # Telegram Patient Assistant configuration
+    # -----------------------------------------------------------------------
+    telegram_enabled: bool = False
+    telegram_bot_token: str = ""
+    telegram_mode: str = "polling"  # "polling" | "webhook"
+    telegram_webhook_url: str = ""
+    telegram_webhook_secret: str = ""
+    telegram_allowed_users: str = ""  # comma-separated Telegram numeric user IDs, empty = open to all
+    telegram_session_ttl_minutes: int = 240
+    telegram_rate_limit_per_minute: int = 30
+    telegram_otp_ttl_minutes: int = 10
+    telegram_otp_max_attempts: int = 3
+    telegram_timezone: str = "Asia/Kolkata"
+    telegram_web_app_url: str = "http://localhost:5173"
+    telegram_otp_provider: str = "dev"  # "dev" | "email" | "sms"
+    telegram_request_timeout_seconds: float = 30.0
+
+
     @model_validator(mode="after")
     def reject_unsafe_production_settings(self) -> "Settings":
         """Prevent sample credentials and permissive browser access in production."""
@@ -112,13 +131,39 @@ class Settings(BaseSettings):
         if not origins or "*" in origins or any("localhost" in origin.lower() for origin in origins):
             raise ValueError("CORS_ORIGINS must list explicit non-localhost HTTPS origins in production.")
 
+        if self.telegram_enabled:
+            if not self.telegram_bot_token or self.telegram_bot_token.lower().startswith(unsafe_secret_prefixes):
+                raise ValueError("TELEGRAM_BOT_TOKEN must be a valid non-default token in production.")
+            if self.telegram_mode.lower() != "webhook":
+                raise ValueError("TELEGRAM_MODE must be 'webhook' in production deployments.")
+            if not self.telegram_webhook_url or not self.telegram_webhook_url.startswith("https://") or "localhost" in self.telegram_webhook_url:
+                raise ValueError("TELEGRAM_WEBHOOK_URL must be a public HTTPS URL in production.")
+            if not self.telegram_webhook_secret or len(self.telegram_webhook_secret) < 16:
+                raise ValueError("TELEGRAM_WEBHOOK_SECRET must be at least 16 characters in production.")
+            if "localhost" in self.telegram_web_app_url.lower() or not self.telegram_web_app_url.startswith("https://"):
+                raise ValueError("TELEGRAM_WEB_APP_URL must be an HTTPS URL in production.")
+            if self.telegram_otp_provider.lower() == "dev":
+                raise ValueError("TELEGRAM_OTP_PROVIDER cannot be 'dev' in production.")
+
         return self
 
     @property
     def cors_origins_list(self) -> List[str]:
         return [o.strip() for o in self.cors_origins.split(",") if o.strip()]
 
+    @property
+    def telegram_allowed_users_set(self) -> set:
+        if not self.telegram_allowed_users:
+            return set()
+        result = set()
+        for u in self.telegram_allowed_users.split(","):
+            u_str = u.strip()
+            if u_str.isdigit():
+                result.add(int(u_str))
+        return result
+
 
 @lru_cache
 def get_settings() -> Settings:
     return Settings()
+

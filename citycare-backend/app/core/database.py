@@ -103,4 +103,37 @@ async def ensure_indexes() -> None:
         name="uniq_handbook_doc_version_chunk",
     )
 
+    # 6. Telegram Identities (1-to-1 mapping)
+    await db.telegram_identities.create_index("telegram_user_id", unique=True, name="uniq_telegram_user_id")
+    try:
+        await db.telegram_identities.create_index(
+            "patient_id",
+            unique=True,
+            partialFilterExpression={"patient_id": {"$exists": True, "$type": "string"}},
+            name="uniq_telegram_patient_id",
+        )
+    except Exception as exc:
+        logger.debug("Telegram identities patient_id partial unique index notice: %s", exc)
+
+    # 7. Telegram Sessions (Deterministic session key + TTL expiry)
+    await db.telegram_sessions.create_index("session_key", unique=True, name="uniq_telegram_session_key")
+    await db.telegram_sessions.create_index("expires_at", expireAfterSeconds=0, name="ttl_telegram_sessions")
+
+    # 8. Telegram OTP Tokens (Salted hash + TTL expiry)
+    await db.telegram_otp_tokens.create_index("otp_id", unique=True, name="uniq_telegram_otp_id")
+    await db.telegram_otp_tokens.create_index("expires_at", expireAfterSeconds=0, name="ttl_telegram_otp_tokens")
+    await db.telegram_otp_tokens.create_index([("telegram_user_id", 1), ("purpose", 1)], name="telegram_otp_user_purpose")
+
+    # 9. Account Activation Tokens (One-time secure web password setup + TTL expiry)
+    await db.account_activation_tokens.create_index("token_hash", unique=True, name="uniq_activation_token_hash")
+    await db.account_activation_tokens.create_index("expires_at", expireAfterSeconds=0, name="ttl_activation_tokens")
+    await db.account_activation_tokens.create_index("patient_id", name="activation_patient_id")
+
+    # 10. Telegram Idempotency & Distributed Rate Limits
+    await db.telegram_idempotency.create_index("update_id", unique=True, name="uniq_telegram_idempotency_update")
+    await db.telegram_idempotency.create_index("expires_at", expireAfterSeconds=0, name="ttl_telegram_idempotency")
+    await db.telegram_rate_limits.create_index("key", unique=True, name="uniq_telegram_rate_limit_key")
+    await db.telegram_rate_limits.create_index("expires_at", expireAfterSeconds=0, name="ttl_telegram_rate_limits")
+
     logger.info("MongoDB indexes ensured successfully.")
+

@@ -69,6 +69,12 @@ app.include_router(prescription_routes.router)
 app.include_router(patient_ai_routes.router)
 app.include_router(voice_routes.router)
 
+# Telegram webhook route
+from telegram_gateway.webhook import router as telegram_router
+app.include_router(telegram_router)
+
+
+
 
 @app.get("/health", tags=["Health"])
 async def health():

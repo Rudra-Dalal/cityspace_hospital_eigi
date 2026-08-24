@@ -214,6 +214,59 @@ When a patient or client queries `GET /patient/doctors/{id}/availability?date=YY
 
 ---
 
+---
+
+## Telegram Patient Assistant Gateway
+
+The Telegram Patient Assistant (`telegram_gateway/`) allows patients to discover hospitals, find specialist doctors, check real-time availability, book appointments, access prescriptions with secure PDF delivery, and ask clinic/health questions.
+
+### Gateway Architecture
+- **Process Separation**: Polling runs in a separate process (`python -m telegram_gateway.poller`), while production uses FastAPI Webhook (`POST /telegram/webhook`).
+- **Persistent Sessions**: Backed by MongoDB (`telegram_sessions`) with deterministic session keys (`tg:private:<chat_id>:0`) and TTL auto-expiration.
+- **Identity & Linking**: Immutable numeric Telegram User ID mapped 1-to-1 to Patient ID with salted OTP verification.
+- **Password Activation**: Telegram registration creates the patient account and sends a secure one-time activation link to set web credentials on the portal; no passwords in Telegram.
+- **Distributed Rate Limiting**: MongoDB atomic counter (`telegram_rate_limits`) with TTL windows safe across multiple workers.
+- **Update Idempotency**: Atomic claim on `telegram_idempotency` preventing duplicate bookings.
+
+### Telegram Commands
+| Command | Description |
+|---|---|
+| `/start` | Welcome banner, connection status, and primary navigation menu |
+| `/help` | Detailed command and feature guide |
+| `/hospitals` | List all active hospital branches with locations and contact info |
+| `/doctors` | List active specialist doctors with qualifications and fees |
+| `/specializations` | Browse medical departments and filter doctors |
+| `/facilities` | View hospital facilities and emergency contacts |
+| `/book` | Start deterministic 5-step appointment booking flow |
+| `/my_appointments` | View scheduled visits and cancel upcoming appointments |
+| `/my_prescriptions` | View medical diagnoses and download official prescription PDFs |
+| `/link` | Link existing CityCare patient account via 6-digit OTP |
+| `/register` | Register new patient account with consent and password setup link |
+| `/status` | View verification status and linked profile |
+| `/cancel` / `/reset` | Clear active flow and return to main menu |
+
+### Running the Telegram Gateway
+
+**Local Development (Polling Mode):**
+```bash
+python -m telegram_gateway.poller
+# or
+python run_telegram_poller.py
+```
+
+**Production (Webhook Mode):**
+Configure in `.env`:
+```env
+TELEGRAM_ENABLED=true
+TELEGRAM_BOT_TOKEN=<your_token>
+TELEGRAM_MODE=webhook
+TELEGRAM_WEBHOOK_URL=https://api.citycare.clinic/telegram/webhook
+TELEGRAM_WEBHOOK_SECRET=<your_secret_token>
+TELEGRAM_TIMEZONE=Asia/Kolkata
+```
+
+---
+
 ## Automated Verification & Test Results
 
 Run the complete backend test suite:
@@ -223,10 +276,11 @@ Run the complete backend test suite:
 ```
 
 ### Current Test Suite Status
-- **Total Tests Executed**: **103**
-- **Passed**: **103 (100%)**
+- **Total Tests Executed**: **115**
+- **Passed**: **115 (100%)**
 - **Failed**: **0**
 - **Test Modules**:
+  - `tests/test_telegram_gateway.py`: 12 passed
   - `tests/test_patient_domain.py`: 12 passed
   - `tests/test_cli.py`: 40 passed
   - `tests/test_ai_chat.py`: 17 passed
@@ -237,3 +291,4 @@ Run the complete backend test suite:
   - `tests/test_doctor.py`: 4 passed
   - `tests/test_prescription_rag.py`: 3 passed
   - `tests/test_prescriptions.py`: 2 passed
+

@@ -1,0 +1,168 @@
+"""Verified patient prescriptions listing and secure PDF delivery."""
+
+from typing import Any, Dict, List, Optional
+from app.services.patient_prescription_service import (
+    get_patient_prescriptions,
+    get_prescription_details,
+)
+from telegram_gateway.adapter import TelegramAdapter, escape_markdown
+from telegram_gateway.keyboards import build_inline_keyboard, main_menu_keyboard
+from app.utils.logger import get_logger
+
+logger = get_logger(__name__)
+
+
+async def show_patient_prescriptions(
+    adapter: TelegramAdapter,
+    chat_id: int,
+    patient: Optional[Dict[str, Any]],
+) -> None:
+    """List prescriptions issued to the verified patient."""
+    if not patient:
+        await adapter.send_message(
+            chat_id=chat_id,
+            text="🔒 Please link your account with /link or register with /register to access prescriptions.",
+            reply_markup=main_menu_keyboard(is_verified=False),
+        )
+        return
+
+    patient_id = str(patient["_id"])
+    prescriptions = await get_patient_prescriptions(patient_id)
+
+    if not prescriptions:
+        await adapter.send_message(
+            chat_id=chat_id,
+            text="💊 *My Prescriptions*\n\nYou do not have any prescriptions on file yet\\.",
+            reply_markup=main_menu_keyboard(is_verified=True),
+        )
+        return
+
+    text_lines = ["💊 *My Prescriptions*\n", "Select a prescription to view details and download your medical PDF:\n"]
+    buttons = []
+
+    for rx in prescriptions[:10]:
+        rx_id = rx.get("id")
+        d_name = rx.get("doctor_name") or "Specialist Doctor"
+        diag = rx.get("diagnosis") or "Medical Consultation"
+        created = str(rx.get("created_at", ""))[:10]
+
+        d_name_esc = escape_markdown(d_name)
+        diag_esc = escape_markdown(diag)
+        created_esc = escape_markdown(created)
+
+        text_lines.append(f"• *{diag_esc}*\n  👨‍⚕️ {d_name_esc} | 📅 {created_esc}")
+        btn_label = f"📄 {diag[:18]} ({created})"
+        buttons.append([{"text": btn_label, "callback_data": f"rx:view:{rx_id}"}])
+
+    buttons.append([{"text": "🔙 Main Menu", "callback_data": "nav:main"}])
+
+    await adapter.send_message(
+        chat_id=chat_id,
+        text="\n".join(text_lines),
+        reply_markup=build_inline_keyboard(buttons),
+    )
+
+
+async def show_prescription_detail(
+    adapter: TelegramAdapter,
+    chat_id: int,
+    patient: Optional[Dict[str, Any]],
+    prescription_id: str,
+    callback_query_id: Optional[str] = None,
+) -> None:
+    """Show detailed prescription summary with option to download PDF."""
+    if not patient:
+        if callback_query_id:
+            await adapter.answer_callback_query(callback_query_id, text="Unauthorized", show_alert=True)
+        return
+
+    patient_id = str(patient["_id"])
+    rx = await get_prescription_details(prescription_id=prescription_id, patient_id=patient_id)
+
+    if not rx:
+        if callback_query_id:
+            await adapter.answer_callback_query(callback_query_id, text="Prescription not found", show_alert=True)
+        await adapter.send_message(chat_id=chat_id, text="Prescription not found or access denied\\.")
+        return
+
+    if callback_query_id:
+        await adapter.answer_callback_query(callback_query_id)
+
+    diag_esc = escape_markdown(rx.get("diagnosis"))
+    d_name_esc = escape_markdown(rx.get("doctor_name") or "Specialist Doctor")
+    created_esc = escape_markdown(str(rx.get("created_at", ""))[:10])
+    inst_esc = escape_markdown(rx.get("general_instructions") or "Follow prescription schedule as advised.")
+
+    med_lines = []
+    for m in rx.get("medicines", []):
+        m_name = escape_markdown(m.get("name"))
+        dosage = escape_markdown(m.get("dosage"))
+        freq = escape_markdown(m.get("frequency"))
+        dur = escape_markdown(m.get("duration"))
+        minst = escape_markdown(m.get("instructions", ""))
+        minst_str = f" \\({minst}\\)" if minst else ""
+        med_lines.append(f"  • *{m_name}* — {dosage} | {freq} for {dur}{minst_str}")
+
+    meds_str = "\n".join(med_lines) if med_lines else "  _No medications listed\\._"
+
+    detail_msg = f"""💊 *Prescription Details*
+
+📋 *Diagnosis:* {diag_esc}
+👨‍⚕️ *Prescribed by:* {d_name_esc}
+📅 *Date:* {created_esc}
+
+💊 *Medications:*
+{meds_str}
+
+📝 *Instructions:*
+{inst_esc}"""
+
+    buttons = []
+    pdf_url = rx.get("pdf_url")
+    if pdf_url:
+        buttons.append([{"text": "📥 Download PDF Document", "callback_data": f"rx:pdf:{prescription_id}"}])
+    buttons.append([{"text": "📋 All Prescriptions", "callback_data": "nav:my_prescriptions"}])
+
+    await adapter.send_message(
+        chat_id=chat_id,
+        text=detail_msg,
+        reply_markup=build_inline_keyboard(buttons),
+    )
+
+
+async def send_prescription_pdf(
+    adapter: TelegramAdapter,
+    chat_id: int,
+    patient: Optional[Dict[str, Any]],
+    prescription_id: str,
+    callback_query_id: Optional[str] = None,
+) -> None:
+    """Deliver prescription PDF document to Telegram chat."""
+    if not patient:
+        if callback_query_id:
+            await adapter.answer_callback_query(callback_query_id, text="Unauthorized", show_alert=True)
+        return
+
+    patient_id = str(patient["_id"])
+    rx = await get_prescription_details(prescription_id=prescription_id, patient_id=patient_id)
+
+    if not rx or not rx.get("pdf_url"):
+        if callback_query_id:
+            await adapter.answer_callback_query(callback_query_id, text="PDF not available", show_alert=True)
+        await adapter.send_message(chat_id=chat_id, text="Prescription PDF is not available.")
+        return
+
+    if callback_query_id:
+        await adapter.answer_callback_query(callback_query_id, text="Sending PDF document...")
+
+    pdf_url = rx.get("pdf_url")
+    diag = rx.get("diagnosis", "Prescription")
+    caption = f"📄 CityCare Official Prescription: {diag}"
+
+    await adapter.send_chat_action(chat_id=chat_id, action="upload_document")
+    await adapter.send_document(
+        chat_id=chat_id,
+        document=pdf_url,
+        filename=f"Prescription_{prescription_id[:8]}.pdf",
+        caption=caption,
+    )

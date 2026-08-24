@@ -171,12 +171,27 @@ Both the Super Admin and the branch Hospital Manager can tune doctor schedules:
 
 ---
 
+---
+
+## Telegram Patient Assistant Gateway
+
+A dedicated, isolated conversational gateway (`telegram_gateway/`) for patients built on Hermes Agent architecture principles:
+
+- **Transport Separation**: Dedicated local polling process (`python run_telegram_poller.py`) and FastAPI Webhook (`POST /telegram/webhook`) for production.
+- **Persistent Sessions**: MongoDB persistent session state (`telegram_sessions`) with deterministic keys (`tg:private:<chat_id>:0`) and TTL expiry.
+- **1-to-1 Identity Mapping**: Salted OTP verification linking Telegram numeric user IDs to patient accounts.
+- **Secure Activation**: Telegram registration creates the patient account and sends a secure one-time activation link to set web credentials on the portal.
+- **Distributed Rate Limiting**: Multi-worker safe atomic MongoDB counter (`telegram_rate_limits`).
+- **Update Idempotency**: Atomic claim on `telegram_idempotency` preventing duplicate bookings.
+
+---
+
 ## Verification & Build Results
 
 ### Backend Automated Test Suite (`pytest -v`)
-- **Total Tests**: **103 passed, 0 failed** (100% pass rate)
-- **Execution Time**: ~1m 46s
+- **Total Tests**: **115 passed, 0 failed** (100% pass rate)
 - **Coverage**:
+  - `tests/test_telegram_gateway.py`: 12 tests (Disabled startup, production validation, markdown escaping, OTP & identity mapping, consent & activation tokens, persistent sessions, distributed rate limiting, update idempotency, discovery flows, booking state machine, AI emergency escalation, webhook security)
   - `tests/test_patient_domain.py`: 12 tests (Multi-tenant discovery, weekday availability, inactive status rejection, manager authorization, migration idempotency)
   - `tests/test_cli.py`: 40 tests (CLI subcommands, token resolution, security enforcement, deactivated user blocking)
   - `tests/test_ai_chat.py`: 17 tests (Doctor clinical chat, conversation continuity, rate limits)
@@ -190,3 +205,4 @@ Both the Super Admin and the branch Hospital Manager can tune doctor schedules:
 
 ### Frontend Production Build (`npm run build`)
 - **Status**: **0 errors**, client bundle + SSR Nitro worker generated successfully.
+
