@@ -31,7 +31,16 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 import { formatDate, nextDays, toDateKey } from "@/lib/format";
 
-const SYMPTOMS = ["fever", "cough", "cold", "bodyache", "headache", "fatigue", "throat irritation", "other"] as const;
+const SYMPTOMS = [
+  "fever",
+  "cough",
+  "cold",
+  "bodyache",
+  "headache",
+  "fatigue",
+  "throat irritation",
+  "other",
+] as const;
 
 export const Route = createFileRoute("/patient/book")({
   ssr: false,
@@ -40,7 +49,8 @@ export const Route = createFileRoute("/patient/book")({
       { title: "Book a consultation — CityCare" },
       {
         name: "description",
-        content: "Select your hospital branch, choose your specialist physician, and book an appointment in real-time.",
+        content:
+          "Select your hospital branch, choose your specialist physician, and book an appointment in real-time.",
       },
       { property: "og:title", content: "Book a consultation — CityCare" },
       {
@@ -146,25 +156,33 @@ function BookAppointment() {
       setSuccess({
         date: variables.date,
         slot: variables.slot,
-        doctorName: selectedDoctor ? `Dr. ${selectedDoctor.first_name} ${selectedDoctor.last_name}` : undefined,
+        doctorName: selectedDoctor
+          ? `Dr. ${selectedDoctor.first_name} ${selectedDoctor.last_name}`
+          : undefined,
         hospitalName: selectedHospital ? selectedHospital.name : undefined,
       });
       setConflict("");
       setSlot(null);
       toast.success("Appointment successfully confirmed");
       queryClient.invalidateQueries({ queryKey: ["appointments"] });
-      queryClient.invalidateQueries({ queryKey: ["doctor-availability", selectedDoctor?.id, variables.date] });
+      queryClient.invalidateQueries({
+        queryKey: ["doctor-availability", selectedDoctor?.id, variables.date],
+      });
     },
     onError: (error) => {
       const msg = error instanceof Error ? error.message : "Could not book this slot";
       setConflict(msg);
       toast.error(msg);
-      queryClient.invalidateQueries({ queryKey: ["doctor-availability", selectedDoctor?.id, date] });
+      queryClient.invalidateQueries({
+        queryKey: ["doctor-availability", selectedDoctor?.id, date],
+      });
     },
   });
 
   function toggleSymptom(value: string) {
-    setSymptoms((prev) => (prev.includes(value) ? prev.filter((s) => s !== value) : [...prev, value]));
+    setSymptoms((prev) =>
+      prev.includes(value) ? prev.filter((s) => s !== value) : [...prev, value],
+    );
   }
 
   function handleSubmit(event: React.FormEvent) {
@@ -174,7 +192,8 @@ function BookAppointment() {
     if (!selectedHospital) next.hospital = "Please select a hospital branch";
     if (!selectedDoctor) next.doctor = "Please select a specialist doctor";
     if (!slot) next.slot = "Please choose an available time slot";
-    if (reason.trim().length < 10) next.reason = "Please enter at least 10 characters describing your symptoms or visit purpose";
+    if (reason.trim().length < 10)
+      next.reason = "Please enter at least 10 characters describing your symptoms or visit purpose";
 
     let tempNum: number | undefined = undefined;
     if (temperature.trim()) {
@@ -230,29 +249,44 @@ function BookAppointment() {
               Appointment Scheduled
             </h1>
             <p className="mt-2 text-sm text-muted-foreground">
-              Your consultation has been securely recorded. Please arrive 10 minutes prior to your slot.
+              Your consultation has been securely recorded. Please arrive 10 minutes prior to your
+              slot.
             </p>
           </div>
 
           {/* Appointment Details Box */}
           <div className="rounded-2xl border border-border/80 bg-surface/70 p-6 text-left space-y-3.5">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-border/50 pb-3 gap-1">
-              <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Physician</span>
-              <span className="text-sm font-bold text-foreground">{success.doctorName || "Assigned Specialist"}</span>
+              <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                Physician
+              </span>
+              <span className="text-sm font-bold text-foreground">
+                {success.doctorName || "Assigned Specialist"}
+              </span>
             </div>
 
             <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-border/50 pb-3 gap-1">
-              <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Hospital Branch</span>
-              <span className="text-sm font-medium text-foreground">{success.hospitalName || "CityCare Branch"}</span>
+              <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                Hospital Branch
+              </span>
+              <span className="text-sm font-medium text-foreground">
+                {success.hospitalName || "CityCare Branch"}
+              </span>
             </div>
 
             <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-border/50 pb-3 gap-1">
-              <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Date</span>
-              <span className="text-sm font-medium text-foreground">{formatDate(success.date)}</span>
+              <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                Date
+              </span>
+              <span className="text-sm font-medium text-foreground">
+                {formatDate(success.date)}
+              </span>
             </div>
 
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1">
-              <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Time Slot</span>
+              <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                Time Slot
+              </span>
               <span className="text-sm font-bold text-primary">{success.slot}</span>
             </div>
           </div>
@@ -297,10 +331,25 @@ function BookAppointment() {
       <div className="rounded-2xl border border-border/70 bg-card p-3 sm:p-4 shadow-subtle">
         <div className="grid grid-cols-4 gap-2 text-center">
           {[
-            { step: 1, label: "1. Hospital", active: Boolean(selectedHospital), current: currentStep === 1 },
-            { step: 2, label: "2. Doctor", active: Boolean(selectedDoctor), current: currentStep === 2 },
+            {
+              step: 1,
+              label: "1. Hospital",
+              active: Boolean(selectedHospital),
+              current: currentStep === 1,
+            },
+            {
+              step: 2,
+              label: "2. Doctor",
+              active: Boolean(selectedDoctor),
+              current: currentStep === 2,
+            },
             { step: 3, label: "3. Date & Slot", active: Boolean(slot), current: currentStep === 3 },
-            { step: 4, label: "4. Confirm", active: Boolean(slot && reason.length >= 10), current: currentStep === 4 },
+            {
+              step: 4,
+              label: "4. Confirm",
+              active: Boolean(slot && reason.length >= 10),
+              current: currentStep === 4,
+            },
           ].map((item) => (
             <div
               key={item.step}
@@ -309,8 +358,8 @@ function BookAppointment() {
                 item.current
                   ? "bg-primary/10 text-primary font-bold ring-1 ring-primary/30"
                   : item.active
-                  ? "bg-secondary/40 text-foreground font-medium"
-                  : "text-muted-foreground/60 font-normal",
+                    ? "bg-secondary/40 text-foreground font-medium"
+                    : "text-muted-foreground/60 font-normal",
               )}
             >
               <span
@@ -319,8 +368,8 @@ function BookAppointment() {
                   item.active
                     ? "bg-primary text-primary-foreground"
                     : item.current
-                    ? "bg-primary/20 text-primary"
-                    : "bg-muted text-muted-foreground",
+                      ? "bg-primary/20 text-primary"
+                      : "bg-muted text-muted-foreground",
                 )}
               >
                 {item.active ? "✓" : item.step}
@@ -414,7 +463,9 @@ function BookAppointment() {
 
                     <p className="mt-2 flex items-center gap-1.5 text-xs text-muted-foreground">
                       <MapPin className="h-3.5 w-3.5 shrink-0 text-primary/70" />
-                      <span className="truncate">{h.address ? `${h.address}, ${h.city || ""}` : h.city || "Branch Location"}</span>
+                      <span className="truncate">
+                        {h.address ? `${h.address}, ${h.city || ""}` : h.city || "Branch Location"}
+                      </span>
                     </p>
 
                     {h.contact_phone ? (
@@ -441,7 +492,9 @@ function BookAppointment() {
               })}
             </div>
           )}
-          {errors.hospital ? <p className="text-xs font-semibold text-destructive">{errors.hospital}</p> : null}
+          {errors.hospital ? (
+            <p className="text-xs font-semibold text-destructive">{errors.hospital}</p>
+          ) : null}
         </section>
 
         {/* STEP 2: Select Specialist Doctor */}
@@ -533,7 +586,9 @@ function BookAppointment() {
                         )}
                       </div>
 
-                      <p className="mt-2.5 text-xs text-muted-foreground font-medium">{doc.qualification}</p>
+                      <p className="mt-2.5 text-xs text-muted-foreground font-medium">
+                        {doc.qualification}
+                      </p>
 
                       <div className="mt-3.5 flex items-center justify-between text-[11px] text-muted-foreground border-t border-border/50 pt-2.5">
                         <span className="flex items-center gap-1">
@@ -549,7 +604,9 @@ function BookAppointment() {
                 })}
               </div>
             )}
-            {errors.doctor ? <p className="text-xs font-semibold text-destructive">{errors.doctor}</p> : null}
+            {errors.doctor ? (
+              <p className="text-xs font-semibold text-destructive">{errors.doctor}</p>
+            ) : null}
           </section>
         ) : null}
 
@@ -583,9 +640,13 @@ function BookAppointment() {
                         )}
                       >
                         <span className="block text-[10px] font-bold uppercase tracking-wider opacity-80">
-                          {index === 0 ? "Today" : day.toLocaleDateString(undefined, { weekday: "short" })}
+                          {index === 0
+                            ? "Today"
+                            : day.toLocaleDateString(undefined, { weekday: "short" })}
                         </span>
-                        <span className="mt-1 block font-display text-lg font-bold leading-none">{day.getDate()}</span>
+                        <span className="mt-1 block font-display text-lg font-bold leading-none">
+                          {day.getDate()}
+                        </span>
                         <span className="mt-1 block text-[10px] opacity-75">
                           {day.toLocaleDateString(undefined, { month: "short" })}
                         </span>
@@ -649,7 +710,9 @@ function BookAppointment() {
                         );
                       })}
                     </div>
-                    {errors.slot ? <p className="mt-3 text-xs font-semibold text-destructive">{errors.slot}</p> : null}
+                    {errors.slot ? (
+                      <p className="mt-3 text-xs font-semibold text-destructive">{errors.slot}</p>
+                    ) : null}
                   </>
                 )}
               </Panel>
@@ -685,14 +748,22 @@ function BookAppointment() {
                     </div>
                   </div>
 
-                  <Field id="temperature" label="Body Temperature (°F, optional)" error={errors.temperature}>
+                  <Field
+                    id="temperature"
+                    label="Body Temperature (°F, optional)"
+                    error={errors.temperature}
+                  >
                     <Input
                       id="temperature"
                       inputMode="decimal"
                       placeholder="e.g. 98.6"
                       value={temperature}
                       onChange={(e) => setTemperature(e.target.value)}
-                      className={cn(fieldInputClass, errors.temperature && fieldErrorClass, "rounded-xl h-10")}
+                      className={cn(
+                        fieldInputClass,
+                        errors.temperature && fieldErrorClass,
+                        "rounded-xl h-10",
+                      )}
                     />
                   </Field>
 
@@ -727,7 +798,8 @@ function BookAppointment() {
                   <div className="flex justify-between">
                     <span className="text-muted-foreground">Specialist:</span>
                     <span className="font-semibold text-foreground">
-                      Dr. {selectedDoctor.first_name} {selectedDoctor.last_name} ({selectedDoctor.specialization})
+                      Dr. {selectedDoctor.first_name} {selectedDoctor.last_name} (
+                      {selectedDoctor.specialization})
                     </span>
                   </div>
                   <div className="flex justify-between">

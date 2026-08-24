@@ -1,5 +1,5 @@
 export const API_BASE_URL =
-  (import.meta.env['VITE_API_BASE_URL'] as string | undefined) ?? "http://localhost:8000";
+  (import.meta.env["VITE_API_BASE_URL"] as string | undefined) ?? "http://localhost:8000";
 
 export type Role = "customer" | "doctor" | "hospital_manager" | "super_admin";
 
@@ -60,10 +60,24 @@ export type Appointment = {
   doctor?: Partial<User> | null;
 };
 
-export type Medicine = { name: string; dosage: string; frequency: string; duration: string; instructions: string };
+export type Medicine = {
+  name: string;
+  dosage: string;
+  frequency: string;
+  duration: string;
+  instructions: string;
+};
 export type Prescription = {
-  id: string; patient_id: string; doctor_id: string; appointment_id: string; diagnosis: string;
-  medicines: Medicine[]; general_instructions: string; created_at?: string; pdf_url?: string | null; doctor_name?: string | null;
+  id: string;
+  patient_id: string;
+  doctor_id: string;
+  appointment_id: string;
+  diagnosis: string;
+  medicines: Medicine[];
+  general_instructions: string;
+  created_at?: string;
+  pdf_url?: string | null;
+  doctor_name?: string | null;
 };
 
 export type Hospital = {
@@ -104,7 +118,9 @@ export class ApiError extends Error {
 function extractMessage(payload: unknown, fallback: string): string {
   if (typeof payload === "string" && payload.trim()) return payload;
   if (payload && typeof payload === "object") {
-    const detail = (payload as { detail?: unknown; message?: unknown }).detail ?? (payload as { message?: unknown }).message;
+    const detail =
+      (payload as { detail?: unknown; message?: unknown }).detail ??
+      (payload as { message?: unknown }).message;
     if (typeof detail === "string") return detail;
     if (Array.isArray(detail)) {
       const first = detail[0] as { msg?: string } | undefined;
@@ -146,7 +162,10 @@ export async function apiFetch<T>(
   }
 
   if (!response.ok) {
-    throw new ApiError(extractMessage(payload, `Request failed (${response.status})`), response.status);
+    throw new ApiError(
+      extractMessage(payload, `Request failed (${response.status})`),
+      response.status,
+    );
   }
   return payload as T;
 }
@@ -177,7 +196,10 @@ export const patientApi = {
   },
   getDoctor: (id: string) => apiFetch<DoctorPublicOut>(`/patient/doctors/${id}`, { auth: false }),
   getDoctorAvailability: (id: string, date: string) =>
-    apiFetch<DoctorAvailabilityOut>(`/patient/doctors/${id}/availability?date=${encodeURIComponent(date)}`, { auth: false }),
+    apiFetch<DoctorAvailabilityOut>(
+      `/patient/doctors/${id}/availability?date=${encodeURIComponent(date)}`,
+      { auth: false },
+    ),
 };
 
 export const appointmentsApi = {
@@ -195,12 +217,17 @@ export const appointmentsApi = {
   mine: () => apiFetch<Appointment[]>("/appointments/my"),
   cancel: (id: number | string) =>
     apiFetch<Appointment>(`/appointments/${id}/cancel`, { method: "PATCH" }),
-  accept: (id: number | string) => apiFetch<Appointment>(`/appointments/${id}/accept`, { method: "PATCH" }),
+  accept: (id: number | string) =>
+    apiFetch<Appointment>(`/appointments/${id}/accept`, { method: "PATCH" }),
 };
 
 export const prescriptionsApi = {
-  create: (body: { appointment_id: string; diagnosis: string; medicines: Medicine[]; general_instructions: string }) =>
-    apiFetch<Prescription>("/prescriptions", { method: "POST", body }),
+  create: (body: {
+    appointment_id: string;
+    diagnosis: string;
+    medicines: Medicine[];
+    general_instructions: string;
+  }) => apiFetch<Prescription>("/prescriptions", { method: "POST", body }),
   get: (id: string) => apiFetch<Prescription>(`/prescriptions/${id}`),
   mine: () => apiFetch<Prescription[]>("/prescriptions/my"),
 };
@@ -246,21 +273,28 @@ export type AIChatResponse = {
 };
 
 export const aiApi = {
-  chat: (body: AIChatRequest) =>
-    apiFetch<AIChatResponse>("/ai/chat", { method: "POST", body }),
+  chat: (body: AIChatRequest) => apiFetch<AIChatResponse>("/ai/chat", { method: "POST", body }),
 };
 
 export const patientAiApi = {
-  chat: (body: { message: string }) => apiFetch<{ reply: string; sources: string[] }>("/patient-ai/chat", { method: "POST", body }),
+  chat: (body: { message: string }) =>
+    apiFetch<{ reply: string; sources: string[] }>("/patient-ai/chat", { method: "POST", body }),
 };
-
 
 /* ---------- helpers ---------- */
 
 export function asList<T>(payload: unknown): T[] {
   if (Array.isArray(payload)) return payload as T[];
   if (payload && typeof payload === "object") {
-    for (const key of ["items", "data", "results", "appointments", "doctors", "users", "hospitals"]) {
+    for (const key of [
+      "items",
+      "data",
+      "results",
+      "appointments",
+      "doctors",
+      "users",
+      "hospitals",
+    ]) {
       const value = (payload as Record<string, unknown>)[key];
       if (Array.isArray(value)) return value as T[];
     }

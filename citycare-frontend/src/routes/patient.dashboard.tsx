@@ -14,7 +14,13 @@ import {
   Building2,
 } from "lucide-react";
 import { toast } from "sonner";
-import { appointmentsApi, asList, prescriptionsApi, type Appointment, type Prescription } from "@/lib/api";
+import {
+  appointmentsApi,
+  asList,
+  prescriptionsApi,
+  type Appointment,
+  type Prescription,
+} from "@/lib/api";
 import { PatientPrescriptionChat } from "@/components/ai/PatientPrescriptionChat";
 import { useAuth } from "@/lib/auth";
 import { RoleGate } from "@/components/RoleGate";
@@ -34,9 +40,15 @@ export const Route = createFileRoute("/patient/dashboard")({
   head: () => ({
     meta: [
       { title: "My appointments — CityCare" },
-      { name: "description", content: "View, manage and cancel your upcoming CityCare hospital appointments." },
+      {
+        name: "description",
+        content: "View, manage and cancel your upcoming CityCare hospital appointments.",
+      },
       { property: "og:title", content: "My appointments — CityCare" },
-      { property: "og:description", content: "Your upcoming visits, reasons and status in one calm view." },
+      {
+        property: "og:description",
+        content: "Your upcoming visits, reasons and status in one calm view.",
+      },
     ],
   }),
   component: () => (
@@ -66,7 +78,8 @@ function PatientDashboard() {
       toast.success("Appointment successfully cancelled");
       queryClient.invalidateQueries({ queryKey: ["appointments"] });
     },
-    onError: (error) => toast.error(error instanceof Error ? error.message : "Could not cancel appointment"),
+    onError: (error) =>
+      toast.error(error instanceof Error ? error.message : "Could not cancel appointment"),
   });
 
   const all = query.data ?? [];
@@ -98,7 +111,9 @@ function PatientDashboard() {
             <LoadingRows rows={2} />
           ) : query.isError ? (
             <ErrorNote
-              message={query.error instanceof Error ? query.error.message : "Could not load appointments"}
+              message={
+                query.error instanceof Error ? query.error.message : "Could not load appointments"
+              }
               onRetry={() => query.refetch()}
             />
           ) : upcoming.length === 0 ? (
@@ -134,7 +149,11 @@ function PatientDashboard() {
             <LoadingRows rows={2} />
           ) : prescriptions.isError ? (
             <ErrorNote
-              message={prescriptions.error instanceof Error ? prescriptions.error.message : "Could not load prescriptions"}
+              message={
+                prescriptions.error instanceof Error
+                  ? prescriptions.error.message
+                  : "Could not load prescriptions"
+              }
               onRetry={() => prescriptions.refetch()}
             />
           ) : (prescriptions.data || []).length === 0 ? (
@@ -167,10 +186,13 @@ function PatientDashboard() {
                     </p>
                     {prescription.medicines && prescription.medicines.length > 0 ? (
                       <div className="mt-3 space-y-1 rounded-xl bg-surface p-3 text-xs">
-                        <p className="font-semibold text-foreground/80 mb-1">Prescribed Medicines:</p>
+                        <p className="font-semibold text-foreground/80 mb-1">
+                          Prescribed Medicines:
+                        </p>
                         {prescription.medicines.map((m, idx) => (
                           <p key={idx} className="text-muted-foreground text-[11px]">
-                            • <strong className="text-foreground">{m.name}</strong> ({m.dosage}) - {m.frequency}
+                            • <strong className="text-foreground">{m.name}</strong> ({m.dosage}) -{" "}
+                            {m.frequency}
                           </p>
                         ))}
                       </div>
@@ -179,7 +201,12 @@ function PatientDashboard() {
 
                   {prescription.pdf_url ? (
                     <div className="mt-4 flex items-center gap-2 border-t border-border/50 pt-3">
-                      <Button asChild size="sm" variant="outline" className="rounded-xl flex-1 text-xs tap-feedback">
+                      <Button
+                        asChild
+                        size="sm"
+                        variant="outline"
+                        className="rounded-xl flex-1 text-xs tap-feedback"
+                      >
                         <a href={prescription.pdf_url} target="_blank" rel="noreferrer">
                           <ExternalLink className="mr-1.5 h-3.5 w-3.5" /> View PDF
                         </a>

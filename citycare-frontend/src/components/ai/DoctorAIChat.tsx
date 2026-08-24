@@ -8,13 +8,7 @@
  *   └── AIInput       (text input, send button, Enter key handling)
  */
 
-import {
-  useCallback,
-  useEffect,
-  useRef,
-  useState,
-  type KeyboardEvent,
-} from "react";
+import { useCallback, useEffect, useRef, useState, type KeyboardEvent } from "react";
 import {
   Bot,
   RefreshCcw,
@@ -181,9 +175,7 @@ function SimpleMarkdown({ text }: { text: string }) {
         const boldParts = trimmed.split(/\*\*(.*?)\*\*/g);
         return (
           <p key={i}>
-            {boldParts.map((part, j) =>
-              j % 2 === 1 ? <strong key={j}>{part}</strong> : part,
-            )}
+            {boldParts.map((part, j) => (j % 2 === 1 ? <strong key={j}>{part}</strong> : part))}
           </p>
         );
       })}
@@ -200,12 +192,7 @@ function AIMessage({ message }: { message: Message }) {
   const isError = message.role === "error";
 
   return (
-    <div
-      className={cn(
-        "flex gap-3",
-        isDoctor ? "flex-row-reverse" : "flex-row",
-      )}
-    >
+    <div className={cn("flex gap-3", isDoctor ? "flex-row-reverse" : "flex-row")}>
       {/* Avatar */}
       <div
         className={cn(
@@ -217,7 +204,13 @@ function AIMessage({ message }: { message: Message }) {
               : "bg-primary-soft text-primary",
         )}
       >
-        {isDoctor ? <User className="h-4 w-4" /> : isError ? <AlertCircle className="h-4 w-4" /> : <Bot className="h-4 w-4" />}
+        {isDoctor ? (
+          <User className="h-4 w-4" />
+        ) : isError ? (
+          <AlertCircle className="h-4 w-4" />
+        ) : (
+          <Bot className="h-4 w-4" />
+        )}
       </div>
 
       {/* Bubble */}
@@ -296,11 +289,7 @@ function AIInput({
             : "bg-primary text-primary-foreground hover:bg-primary/90",
         )}
       >
-        {loading ? (
-          <Loader2 className="h-4 w-4 animate-spin" />
-        ) : (
-          <Send className="h-4 w-4" />
-        )}
+        {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
       </button>
     </div>
   );
@@ -451,9 +440,7 @@ export function DoctorAIChat() {
             {messages.map((msg) => (
               <AIMessage key={msg.id} message={msg} />
             ))}
-            {loading && activeTool.length > 0 && (
-              <AIToolActivity labels={activeTool} />
-            )}
+            {loading && activeTool.length > 0 && <AIToolActivity labels={activeTool} />}
             {loading && activeTool.length === 0 && (
               <div className="flex gap-3">
                 <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary-soft text-primary">
@@ -472,12 +459,7 @@ export function DoctorAIChat() {
       </div>
 
       {/* Input area */}
-      <AIInput
-        value={input}
-        onChange={setInput}
-        onSend={handleSend}
-        loading={loading}
-      />
+      <AIInput value={input} onChange={setInput} onSend={handleSend} loading={loading} />
     </div>
   );
 }

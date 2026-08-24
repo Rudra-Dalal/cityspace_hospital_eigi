@@ -16,7 +16,14 @@ import {
   XCircle,
 } from "lucide-react";
 import { toast } from "sonner";
-import { ROLE_LABEL, adminApi, asList, type Hospital, type Role, type User as UserType } from "@/lib/api";
+import {
+  ROLE_LABEL,
+  adminApi,
+  asList,
+  type Hospital,
+  type Role,
+  type User as UserType,
+} from "@/lib/api";
 import { RoleGate } from "@/components/RoleGate";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -58,7 +65,10 @@ export const Route = createFileRoute("/admin/dashboard")({
         content: "Super admin control for CityCare hospitals, managers, doctors and user accounts.",
       },
       { property: "og:title", content: "Network administration — CityCare" },
-      { property: "og:description", content: "Hospitals and users across the whole CityCare network." },
+      {
+        property: "og:description",
+        content: "Hospitals and users across the whole CityCare network.",
+      },
     ],
   }),
   component: () => (
@@ -85,10 +95,11 @@ function AdminDashboard() {
     queryFn: async () => asList<UserType>(await adminApi.users()),
   });
 
-  const hospitalList = hospitals.data ?? [];
-  const userList = users.data ?? [];
+  const hospitalList = useMemo(() => hospitals.data ?? [], [hospitals.data]);
+  const userList = useMemo(() => users.data ?? [], [users.data]);
 
-  const invalidateHospitals = () => queryClient.invalidateQueries({ queryKey: ["admin", "hospitals"] });
+  const invalidateHospitals = () =>
+    queryClient.invalidateQueries({ queryKey: ["admin", "hospitals"] });
   const invalidateUsers = () => queryClient.invalidateQueries({ queryKey: ["admin", "users"] });
 
   const toggleStatus = useMutation({
@@ -100,7 +111,8 @@ function AdminDashboard() {
       toast.success("Hospital status updated");
       invalidateHospitals();
     },
-    onError: (error) => toast.error(error instanceof Error ? error.message : "Could not update status"),
+    onError: (error) =>
+      toast.error(error instanceof Error ? error.message : "Could not update status"),
   });
 
   const deactivate = useMutation({
@@ -109,7 +121,8 @@ function AdminDashboard() {
       toast.success("User account deactivated");
       invalidateUsers();
     },
-    onError: (error) => toast.error(error instanceof Error ? error.message : "Could not deactivate user"),
+    onError: (error) =>
+      toast.error(error instanceof Error ? error.message : "Could not deactivate user"),
   });
 
   const [hospitalSearch, setHospitalSearch] = useState("");
@@ -173,10 +186,16 @@ function AdminDashboard() {
 
       <Tabs defaultValue="hospitals" className="mt-8 space-y-6">
         <TabsList className="h-auto flex-wrap rounded-2xl bg-secondary/60 p-1.5 border border-border/60">
-          <TabsTrigger value="hospitals" className="rounded-xl px-5 py-2 text-xs font-bold tap-feedback">
+          <TabsTrigger
+            value="hospitals"
+            className="rounded-xl px-5 py-2 text-xs font-bold tap-feedback"
+          >
             Hospitals ({hospitalList.length})
           </TabsTrigger>
-          <TabsTrigger value="users" className="rounded-xl px-5 py-2 text-xs font-bold tap-feedback">
+          <TabsTrigger
+            value="users"
+            className="rounded-xl px-5 py-2 text-xs font-bold tap-feedback"
+          >
             User Directory ({userList.length})
           </TabsTrigger>
         </TabsList>
@@ -201,7 +220,11 @@ function AdminDashboard() {
               <LoadingRows rows={4} />
             ) : hospitals.isError ? (
               <ErrorNote
-                message={hospitals.error instanceof Error ? hospitals.error.message : "Could not load hospitals"}
+                message={
+                  hospitals.error instanceof Error
+                    ? hospitals.error.message
+                    : "Could not load hospitals"
+                }
                 onRetry={() => hospitals.refetch()}
               />
             ) : filteredHospitals.length === 0 ? (
@@ -228,9 +251,13 @@ function AdminDashboard() {
                         <tr key={hospital.id} className="transition-colors hover:bg-surface/50">
                           <td className="py-3.5 px-4">
                             <p className="font-bold text-foreground">{hospital.name}</p>
-                            <p className="text-xs text-muted-foreground">{hospital.address ?? "—"}</p>
+                            <p className="text-xs text-muted-foreground">
+                              {hospital.address ?? "—"}
+                            </p>
                           </td>
-                          <td className="py-3.5 px-4 text-xs font-medium text-foreground">{hospital.city ?? "—"}</td>
+                          <td className="py-3.5 px-4 text-xs font-medium text-foreground">
+                            {hospital.city ?? "—"}
+                          </td>
                           <td className="py-3.5 px-4 text-xs text-muted-foreground">
                             <p className="break-all">{hospital.contact_email ?? "—"}</p>
                             <p>{hospital.contact_phone ?? "—"}</p>
@@ -281,7 +308,10 @@ function AdminDashboard() {
                 value={userSearch}
                 onChange={setUserSearch}
               />
-              <Select value={roleFilter} onValueChange={(value) => setRoleFilter(value as "all" | Role)}>
+              <Select
+                value={roleFilter}
+                onValueChange={(value) => setRoleFilter(value as "all" | Role)}
+              >
                 <SelectTrigger className="h-11 w-full rounded-xl sm:w-52 border-border bg-card text-xs font-semibold shadow-subtle">
                   <SelectValue placeholder="All roles" />
                 </SelectTrigger>
@@ -299,11 +329,16 @@ function AdminDashboard() {
               <LoadingRows rows={4} />
             ) : users.isError ? (
               <ErrorNote
-                message={users.error instanceof Error ? users.error.message : "Could not load users"}
+                message={
+                  users.error instanceof Error ? users.error.message : "Could not load users"
+                }
                 onRetry={() => users.refetch()}
               />
             ) : filteredUsers.length === 0 ? (
-              <EmptyState title="No matching accounts" description="Adjust your search query or role filter." />
+              <EmptyState
+                title="No matching accounts"
+                description="Adjust your search query or role filter."
+              />
             ) : (
               <div className="overflow-x-auto rounded-2xl border border-border/60">
                 <table className="w-full min-w-[740px] text-sm text-left">
@@ -399,7 +434,9 @@ function HospitalDialog({ hospital, onDone }: { hospital?: Hospital; onDone: () 
 
   const mutation = useMutation({
     mutationFn: (body: Partial<Hospital>) =>
-      editing && hospital ? adminApi.updateHospital(hospital.id, body) : adminApi.createHospital(body),
+      editing && hospital
+        ? adminApi.updateHospital(hospital.id, body)
+        : adminApi.createHospital(body),
     onSuccess: () => {
       toast.success(editing ? "Hospital branch updated" : "Hospital branch registered");
       setOpen(false);
@@ -412,7 +449,11 @@ function HospitalDialog({ hospital, onDone }: { hospital?: Hospital; onDone: () 
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
         {editing ? (
-          <Button variant="ghost" size="sm" className="rounded-xl text-xs font-semibold tap-feedback">
+          <Button
+            variant="ghost"
+            size="sm"
+            className="rounded-xl text-xs font-semibold tap-feedback"
+          >
             <Edit2 className="mr-1.5 h-3.5 w-3.5" /> Edit
           </Button>
         ) : (
@@ -496,7 +537,11 @@ function HospitalDialog({ hospital, onDone }: { hospital?: Hospital; onDone: () 
             </div>
           ) : null}
           <DialogFooter className="sm:col-span-2 pt-2">
-            <Button type="submit" className="rounded-xl font-bold shadow-soft tap-feedback" disabled={mutation.isPending}>
+            <Button
+              type="submit"
+              className="rounded-xl font-bold shadow-soft tap-feedback"
+              disabled={mutation.isPending}
+            >
               {mutation.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
               {editing ? "Save Changes" : "Register Branch"}
             </Button>
@@ -533,7 +578,14 @@ function StaffDialog({
     onSuccess: () => {
       toast.success(kind === "manager" ? "Hospital Manager created" : "Physician account created");
       setOpen(false);
-      setForm({ first_name: "", last_name: "", email: "", mobile: "", password: "", hospital_id: "" });
+      setForm({
+        first_name: "",
+        last_name: "",
+        email: "",
+        mobile: "",
+        password: "",
+        hospital_id: "",
+      });
       onDone();
     },
     onError: (err) => setError(err instanceof Error ? err.message : "Something went wrong"),
@@ -542,8 +594,13 @@ function StaffDialog({
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button size="sm" variant={kind === "manager" ? "outline" : "default"} className="rounded-xl text-xs font-bold tap-feedback">
-          <UserPlus className="mr-1.5 h-3.5 w-3.5" /> New {kind === "manager" ? "Manager" : "Doctor"}
+        <Button
+          size="sm"
+          variant={kind === "manager" ? "outline" : "default"}
+          className="rounded-xl text-xs font-bold tap-feedback"
+        >
+          <UserPlus className="mr-1.5 h-3.5 w-3.5" /> New{" "}
+          {kind === "manager" ? "Manager" : "Doctor"}
         </Button>
       </DialogTrigger>
       <DialogContent className="rounded-2xl sm:max-w-lg">
@@ -579,7 +636,9 @@ function StaffDialog({
               email: form.email.trim(),
               mobile: form.mobile.trim(),
               password: form.password,
-              hospital_id: Number.isNaN(Number(form.hospital_id)) ? form.hospital_id : Number(form.hospital_id),
+              hospital_id: Number.isNaN(Number(form.hospital_id))
+                ? form.hospital_id
+                : Number(form.hospital_id),
             });
           }}
         >
@@ -655,7 +714,11 @@ function StaffDialog({
             </div>
           ) : null}
           <DialogFooter className="sm:col-span-2 pt-2">
-            <Button type="submit" className="rounded-xl font-bold shadow-soft tap-feedback" disabled={mutation.isPending}>
+            <Button
+              type="submit"
+              className="rounded-xl font-bold shadow-soft tap-feedback"
+              disabled={mutation.isPending}
+            >
               {mutation.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
               Create {kind === "manager" ? "Manager Account" : "Physician Account"}
             </Button>

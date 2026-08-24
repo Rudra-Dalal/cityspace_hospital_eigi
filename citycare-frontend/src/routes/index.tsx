@@ -1,6 +1,14 @@
 import { useEffect, useState } from "react";
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { HeartPulse, Loader2, Calendar, ShieldCheck, Stethoscope, Clock, CheckCircle2 } from "lucide-react";
+import {
+  HeartPulse,
+  Loader2,
+  Calendar,
+  ShieldCheck,
+  Stethoscope,
+  Clock,
+  CheckCircle2,
+} from "lucide-react";
 import { ROLE_HOME } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import { Button } from "@/components/ui/button";
@@ -16,7 +24,8 @@ export const Route = createFileRoute("/")({
       { title: "Sign in — CityCare Hospital Network" },
       {
         name: "description",
-        content: "Sign in to CityCare to book hospital appointments, view your schedule or manage your hospital.",
+        content:
+          "Sign in to CityCare to book hospital appointments, view your schedule or manage your hospital.",
       },
       { property: "og:title", content: "Sign in — CityCare" },
       {
@@ -57,7 +66,11 @@ function LoginPage() {
       const signedIn = await login(email.trim(), password);
       navigate({ to: ROLE_HOME[signedIn.role], replace: true });
     } catch (error) {
-      setFormError(error instanceof Error ? error.message : "Unable to sign in. Please verify your credentials.");
+      setFormError(
+        error instanceof Error
+          ? error.message
+          : "Unable to sign in. Please verify your credentials.",
+      );
     } finally {
       setSubmitting(false);
     }
@@ -70,8 +83,12 @@ function LoginPage() {
     >
       <form onSubmit={handleSubmit} className="space-y-5" noValidate>
         <div>
-          <h2 className="font-display text-2xl font-bold tracking-tight text-foreground">Welcome back</h2>
-          <p className="mt-1 text-sm text-muted-foreground">Sign in with your email to access your CityCare account.</p>
+          <h2 className="font-display text-2xl font-bold tracking-tight text-foreground">
+            Welcome back
+          </h2>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Sign in with your email to access your CityCare account.
+          </p>
         </div>
 
         {formError ? <ErrorNote message={formError} /> : null}
@@ -147,12 +164,16 @@ export function AuthLayout({
           <div>
             <span className="inline-flex items-center gap-2 rounded-full border border-border/80 bg-card px-4 py-1.5 shadow-subtle">
               <HeartPulse className="h-4 w-4 text-primary" />
-              <span className="text-xs font-semibold uppercase tracking-wider text-foreground">CityCare Network</span>
+              <span className="text-xs font-semibold uppercase tracking-wider text-foreground">
+                CityCare Network
+              </span>
             </span>
             <h1 className="mt-8 font-display text-4xl font-bold tracking-tight text-foreground xl:text-5xl leading-[1.12]">
               {title}
             </h1>
-            <p className="mt-4 max-w-lg text-base text-muted-foreground leading-relaxed">{subtitle}</p>
+            <p className="mt-4 max-w-lg text-base text-muted-foreground leading-relaxed">
+              {subtitle}
+            </p>
           </div>
 
           <div className="grid gap-3.5 sm:grid-cols-2">

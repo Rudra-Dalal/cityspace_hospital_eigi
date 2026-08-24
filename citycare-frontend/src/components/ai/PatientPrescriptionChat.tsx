@@ -84,9 +84,12 @@ export function PatientPrescriptionChat() {
               <Bot className="h-4 w-4" />
               <span>CityCare Medical AI</span>
             </div>
-            <p className="text-foreground leading-relaxed text-xs sm:text-sm whitespace-pre-wrap">{reply}</p>
+            <p className="text-foreground leading-relaxed text-xs sm:text-sm whitespace-pre-wrap">
+              {reply}
+            </p>
             <p className="text-[10px] text-muted-foreground pt-1 border-t border-primary/10">
-              Disclaimer: AI responses are for informational purposes only. Consult your doctor for personal medical advice.
+              Disclaimer: AI responses are for informational purposes only. Consult your doctor for
+              personal medical advice.
             </p>
           </div>
         ) : null}

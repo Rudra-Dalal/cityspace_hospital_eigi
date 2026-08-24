@@ -19,8 +19,12 @@
   --radius-3xl: calc(var(--radius) + 14px);
   --radius-full: 9999px;
 
-  --font-display: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Fraunces", "Plus Jakarta Sans", system-ui, sans-serif;
-  --font-sans: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Inter", "Source Sans 3", system-ui, sans-serif;
+  --font-display:
+    -apple-system, BlinkMacSystemFont, "SF Pro Display", "Fraunces", "Plus Jakarta Sans", system-ui,
+    sans-serif;
+  --font-sans:
+    -apple-system, BlinkMacSystemFont, "SF Pro Text", "Inter", "Source Sans 3", system-ui,
+    sans-serif;
 
   --color-background: var(--background);
   --color-foreground: var(--foreground);
@@ -171,13 +175,16 @@
   border-radius: var(--radius-2xl);
   border: 1px solid var(--color-border);
   box-shadow: var(--shadow-subtle);
-  transition: border-color 200ms ease, box-shadow 200ms ease;
+  transition:
+    border-color 200ms ease,
+    box-shadow 200ms ease;
 }
 
 @utility hover-lift {
-  transition: transform 240ms cubic-bezier(0.16, 1, 0.3, 1),
-              box-shadow 240ms cubic-bezier(0.16, 1, 0.3, 1),
-              border-color 200ms ease;
+  transition:
+    transform 240ms cubic-bezier(0.16, 1, 0.3, 1),
+    box-shadow 240ms cubic-bezier(0.16, 1, 0.3, 1),
+    border-color 200ms ease;
   &:hover {
     transform: translateY(-2px);
     box-shadow: var(--shadow-lift);
@@ -188,7 +195,9 @@
 }
 
 @utility tap-feedback {
-  transition: transform 150ms cubic-bezier(0.16, 1, 0.3, 1), opacity 150ms ease;
+  transition:
+    transform 150ms cubic-bezier(0.16, 1, 0.3, 1),
+    opacity 150ms ease;
   &:active {
     transform: scale(0.97);
     opacity: 0.92;

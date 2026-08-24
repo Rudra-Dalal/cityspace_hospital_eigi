@@ -69,9 +69,13 @@ export function PrescriptionForm({
           <span className="grid h-7 w-7 place-items-center rounded-lg bg-primary/10 text-primary">
             <Stethoscope className="h-4 w-4" />
           </span>
-          <h4 className="font-display text-base font-bold text-foreground">Issue Medical Prescription</h4>
+          <h4 className="font-display text-base font-bold text-foreground">
+            Issue Medical Prescription
+          </h4>
         </div>
-        <span className="text-xs text-muted-foreground font-mono">Appt #{String(appointmentId).slice(-6)}</span>
+        <span className="text-xs text-muted-foreground font-mono">
+          Appt #{String(appointmentId).slice(-6)}
+        </span>
       </div>
 
       <div className="space-y-4">
@@ -193,7 +197,11 @@ export function PrescriptionForm({
           disabled={saving}
           className="rounded-xl font-bold shadow-soft tap-feedback"
         >
-          {saving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <FileText className="mr-2 h-4 w-4" />}
+          {saving ? (
+            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+          ) : (
+            <FileText className="mr-2 h-4 w-4" />
+          )}
           {saving ? "Generating PDF & Uploading…" : "Save & Issue Prescription"}
         </Button>
       </div>

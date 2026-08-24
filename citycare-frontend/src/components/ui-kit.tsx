@@ -1,5 +1,13 @@
 import type { ReactNode } from "react";
-import { AlertCircle, ArrowUpRight, CheckCircle2, Clock, HelpCircle, RefreshCcw, Sparkles } from "lucide-react";
+import {
+  AlertCircle,
+  ArrowUpRight,
+  CheckCircle2,
+  Clock,
+  HelpCircle,
+  RefreshCcw,
+  Sparkles,
+} from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
@@ -52,7 +60,9 @@ export function Panel({
   children: ReactNode;
 }) {
   return (
-    <section className={cn("surface-panel fade-rise p-5 sm:p-7 relative overflow-hidden", className)}>
+    <section
+      className={cn("surface-panel fade-rise p-5 sm:p-7 relative overflow-hidden", className)}
+    >
       {title ? (
         <div className="mb-6 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between border-b border-border/50 pb-4">
           <div className="min-w-0">
@@ -85,7 +95,9 @@ export function StatCard({
   return (
     <div className="surface-panel hover-lift fade-rise p-5 flex flex-col justify-between">
       <div className="flex items-start justify-between gap-3">
-        <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">{label}</p>
+        <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+          {label}
+        </p>
         {icon ? (
           <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-primary/10 text-primary shadow-subtle">
             {icon}
@@ -106,7 +118,12 @@ export function StatusBadge({ status }: { status?: string | null }) {
   let tone = "bg-muted text-muted-foreground border-border/50";
   let dotColor = "bg-muted-foreground";
 
-  if (value.includes("cancel") || value.includes("reject") || value.includes("inactive") || value.includes("suspend")) {
+  if (
+    value.includes("cancel") ||
+    value.includes("reject") ||
+    value.includes("inactive") ||
+    value.includes("suspend")
+  ) {
     tone = "bg-destructive/10 text-destructive border-destructive/20";
     dotColor = "bg-destructive";
   } else if (value.includes("complete") || value.includes("done")) {
@@ -115,7 +132,12 @@ export function StatusBadge({ status }: { status?: string | null }) {
   } else if (value.includes("pending") || value.includes("wait") || value.includes("scheduled")) {
     tone = "bg-warning/15 text-warning-foreground border-warning/30";
     dotColor = "bg-warning";
-  } else if (value.includes("active") || value.includes("booked") || value.includes("confirm") || value.includes("accepted")) {
+  } else if (
+    value.includes("active") ||
+    value.includes("booked") ||
+    value.includes("confirm") ||
+    value.includes("accepted")
+  ) {
     tone = "bg-success/15 text-success border-success/30";
     dotColor = "bg-success";
   }
@@ -151,7 +173,9 @@ export function EmptyState({
       </div>
       <p className="font-display text-base font-semibold text-foreground">{title}</p>
       {description ? (
-        <p className="mt-1.5 max-w-sm text-xs sm:text-sm text-muted-foreground leading-relaxed">{description}</p>
+        <p className="mt-1.5 max-w-sm text-xs sm:text-sm text-muted-foreground leading-relaxed">
+          {description}
+        </p>
       ) : null}
       {action ? <div className="mt-5">{action}</div> : null}
     </div>
@@ -162,7 +186,10 @@ export function LoadingRows({ rows = 3 }: { rows?: number }) {
   return (
     <div className="space-y-3.5">
       {Array.from({ length: rows }).map((_, i) => (
-        <div key={i} className="flex items-center justify-between gap-4 rounded-2xl border border-border/60 bg-card p-4 shadow-subtle">
+        <div
+          key={i}
+          className="flex items-center justify-between gap-4 rounded-2xl border border-border/60 bg-card p-4 shadow-subtle"
+        >
           <div className="flex items-center gap-3 w-full">
             <Skeleton className="h-10 w-10 rounded-xl shrink-0" />
             <div className="space-y-2 w-full max-w-md">
@@ -177,13 +204,7 @@ export function LoadingRows({ rows = 3 }: { rows?: number }) {
   );
 }
 
-export function ErrorNote({
-  message,
-  onRetry,
-}: {
-  message: string;
-  onRetry?: () => void;
-}) {
+export function ErrorNote({ message, onRetry }: { message: string; onRetry?: () => void }) {
   return (
     <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-destructive/30 bg-destructive/10 p-4 text-sm font-medium text-destructive fade-rise">
       <div className="flex items-center gap-2.5 min-w-0">

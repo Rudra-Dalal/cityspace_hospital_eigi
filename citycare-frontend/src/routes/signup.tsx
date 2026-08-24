@@ -17,7 +17,8 @@ export const Route = createFileRoute("/signup")({
       { title: "Create patient account — CityCare" },
       {
         name: "description",
-        content: "Register as a CityCare patient to book appointments with hospitals across the network.",
+        content:
+          "Register as a CityCare patient to book appointments with hospitals across the network.",
       },
       { property: "og:title", content: "Create patient account — CityCare" },
       {
@@ -55,7 +56,8 @@ function SignupPage() {
     if (form.first_name.trim().length < 2) next.first_name = "Enter your first name";
     if (form.last_name.trim().length < 2) next.last_name = "Enter your last name";
     if (!/^\S+@\S+\.\S+$/.test(form.email.trim())) next.email = "Enter a valid email address";
-    if (!/^[0-9+\-\s()]{7,15}$/.test(form.mobile.trim())) next.mobile = "Enter a valid mobile number";
+    if (!/^[0-9+\-\s()]{7,15}$/.test(form.mobile.trim()))
+      next.mobile = "Enter a valid mobile number";
     if (form.password.length < 6) next.password = "Password must be at least 6 characters";
     setErrors(next);
     setFormError("");
@@ -90,14 +92,22 @@ function SignupPage() {
           <div className="mx-auto grid h-16 w-16 place-items-center rounded-2xl bg-success/15 text-success shadow-subtle">
             <CheckCircle2 className="h-10 w-10" />
           </div>
-          <h2 className="font-display text-2xl font-bold tracking-tight text-foreground">Welcome to CityCare!</h2>
-          <p className="text-sm text-muted-foreground">Your patient account has been created. Redirecting to sign in…</p>
+          <h2 className="font-display text-2xl font-bold tracking-tight text-foreground">
+            Welcome to CityCare!
+          </h2>
+          <p className="text-sm text-muted-foreground">
+            Your patient account has been created. Redirecting to sign in…
+          </p>
         </div>
       ) : (
         <form onSubmit={handleSubmit} className="space-y-4" noValidate>
           <div>
-            <h2 className="font-display text-2xl font-bold tracking-tight text-foreground">Create Patient Account</h2>
-            <p className="mt-1 text-sm text-muted-foreground">Join CityCare in under a minute to book consultations.</p>
+            <h2 className="font-display text-2xl font-bold tracking-tight text-foreground">
+              Create Patient Account
+            </h2>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Join CityCare in under a minute to book consultations.
+            </p>
           </div>
 
           {formError ? <ErrorNote message={formError} /> : null}
@@ -110,7 +120,11 @@ function SignupPage() {
                 placeholder="Jane"
                 value={form.first_name}
                 onChange={(e) => update("first_name", e.target.value)}
-                className={cn(fieldInputClass, errors.first_name && fieldErrorClass, "rounded-xl h-11")}
+                className={cn(
+                  fieldInputClass,
+                  errors.first_name && fieldErrorClass,
+                  "rounded-xl h-11",
+                )}
               />
             </Field>
 
@@ -121,7 +135,11 @@ function SignupPage() {
                 placeholder="Doe"
                 value={form.last_name}
                 onChange={(e) => update("last_name", e.target.value)}
-                className={cn(fieldInputClass, errors.last_name && fieldErrorClass, "rounded-xl h-11")}
+                className={cn(
+                  fieldInputClass,
+                  errors.last_name && fieldErrorClass,
+                  "rounded-xl h-11",
+                )}
               />
             </Field>
           </div>

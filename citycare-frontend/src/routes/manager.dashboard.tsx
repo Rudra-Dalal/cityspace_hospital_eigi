@@ -16,7 +16,13 @@ import {
   User,
 } from "lucide-react";
 import { toast } from "sonner";
-import { asList, managerApi, type Appointment, type Hospital, type User as UserType } from "@/lib/api";
+import {
+  asList,
+  managerApi,
+  type Appointment,
+  type Hospital,
+  type User as UserType,
+} from "@/lib/api";
 import { RoleGate } from "@/components/RoleGate";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -43,7 +49,10 @@ export const Route = createFileRoute("/manager/dashboard")({
         content: "Manage your hospital profile, care team and appointment book inside CityCare.",
       },
       { property: "og:title", content: "Hospital management — CityCare" },
-      { property: "og:description", content: "Hospital profile, doctors and appointments in one place." },
+      {
+        property: "og:description",
+        content: "Hospital profile, doctors and appointments in one place.",
+      },
     ],
   }),
   component: () => (
@@ -56,7 +65,10 @@ export const Route = createFileRoute("/manager/dashboard")({
 function ManagerDashboard() {
   const queryClient = useQueryClient();
 
-  const hospital = useQuery({ queryKey: ["manager", "hospital"], queryFn: () => managerApi.hospital() });
+  const hospital = useQuery({
+    queryKey: ["manager", "hospital"],
+    queryFn: () => managerApi.hospital(),
+  });
   const doctors = useQuery({
     queryKey: ["manager", "doctors"],
     queryFn: async () => asList<UserType>(await managerApi.doctors()),
@@ -98,7 +110,8 @@ function ManagerDashboard() {
       toast.success("Hospital profile updated successfully");
       queryClient.invalidateQueries({ queryKey: ["manager", "hospital"] });
     },
-    onError: (error) => toast.error(error instanceof Error ? error.message : "Could not save changes"),
+    onError: (error) =>
+      toast.error(error instanceof Error ? error.message : "Could not save changes"),
   });
 
   const list = appointments.data ?? [];
@@ -136,25 +149,41 @@ function ManagerDashboard() {
 
       <Tabs defaultValue="profile" className="mt-8 space-y-6">
         <TabsList className="h-auto flex-wrap rounded-2xl bg-secondary/60 p-1.5 border border-border/60">
-          <TabsTrigger value="profile" className="rounded-xl px-5 py-2 text-xs font-bold tap-feedback">
+          <TabsTrigger
+            value="profile"
+            className="rounded-xl px-5 py-2 text-xs font-bold tap-feedback"
+          >
             Branch Profile
           </TabsTrigger>
-          <TabsTrigger value="doctors" className="rounded-xl px-5 py-2 text-xs font-bold tap-feedback">
+          <TabsTrigger
+            value="doctors"
+            className="rounded-xl px-5 py-2 text-xs font-bold tap-feedback"
+          >
             Care Team ({doctors.data?.length ?? 0})
           </TabsTrigger>
-          <TabsTrigger value="appointments" className="rounded-xl px-5 py-2 text-xs font-bold tap-feedback">
+          <TabsTrigger
+            value="appointments"
+            className="rounded-xl px-5 py-2 text-xs font-bold tap-feedback"
+          >
             Appointment Register ({list.length})
           </TabsTrigger>
         </TabsList>
 
         {/* Profile Settings Tab */}
         <TabsContent value="profile" className="fade-rise">
-          <Panel title="Branch Profile & Contact" description="Information displayed to patients during appointment booking.">
+          <Panel
+            title="Branch Profile & Contact"
+            description="Information displayed to patients during appointment booking."
+          >
             {hospital.isLoading ? (
               <LoadingRows rows={3} />
             ) : hospital.isError ? (
               <ErrorNote
-                message={hospital.error instanceof Error ? hospital.error.message : "Could not load hospital details"}
+                message={
+                  hospital.error instanceof Error
+                    ? hospital.error.message
+                    : "Could not load hospital details"
+                }
                 onRetry={() => hospital.refetch()}
               />
             ) : (
@@ -229,12 +258,17 @@ function ManagerDashboard() {
 
         {/* Doctors Care Team Tab */}
         <TabsContent value="doctors" className="fade-rise">
-          <Panel title="Hospital Medical Care Team" description="Physicians actively practicing at this facility.">
+          <Panel
+            title="Hospital Medical Care Team"
+            description="Physicians actively practicing at this facility."
+          >
             {doctors.isLoading ? (
               <LoadingRows rows={3} />
             ) : doctors.isError ? (
               <ErrorNote
-                message={doctors.error instanceof Error ? doctors.error.message : "Could not load doctors"}
+                message={
+                  doctors.error instanceof Error ? doctors.error.message : "Could not load doctors"
+                }
                 onRetry={() => doctors.refetch()}
               />
             ) : (doctors.data ?? []).length === 0 ? (
@@ -253,7 +287,9 @@ function ManagerDashboard() {
                     <div>
                       <div className="flex items-start justify-between gap-2">
                         <div>
-                          <p className="font-display text-base font-bold text-foreground">Dr. {personName(doctor)}</p>
+                          <p className="font-display text-base font-bold text-foreground">
+                            Dr. {personName(doctor)}
+                          </p>
                           <p className="text-xs font-semibold text-primary mt-0.5">
                             {doctor.specialization || "General Medicine"}
                           </p>
@@ -262,12 +298,16 @@ function ManagerDashboard() {
                       </div>
 
                       <p className="mt-3 text-xs text-muted-foreground break-all">{doctor.email}</p>
-                      {doctor.mobile ? <p className="mt-1 text-xs text-muted-foreground">{doctor.mobile}</p> : null}
+                      {doctor.mobile ? (
+                        <p className="mt-1 text-xs text-muted-foreground">{doctor.mobile}</p>
+                      ) : null}
                     </div>
 
                     <div className="mt-4 border-t border-border/50 pt-2.5 text-[11px] text-muted-foreground flex items-center justify-between">
                       <span>{doctor.working_hours || "10:00 - 20:00"}</span>
-                      <span className="truncate max-w-[120px]">{doctor.available_days?.join(", ") || "Mon - Sat"}</span>
+                      <span className="truncate max-w-[120px]">
+                        {doctor.available_days?.join(", ") || "Mon - Sat"}
+                      </span>
                     </div>
                   </div>
                 ))}
@@ -278,18 +318,26 @@ function ManagerDashboard() {
 
         {/* Appointments Register Tab */}
         <TabsContent value="appointments" className="fade-rise">
-          <Panel title="Branch Appointment Register" description="Consolidated record of all visits across this hospital.">
+          <Panel
+            title="Branch Appointment Register"
+            description="Consolidated record of all visits across this hospital."
+          >
             {appointments.isLoading ? (
               <LoadingRows rows={4} />
             ) : appointments.isError ? (
               <ErrorNote
                 message={
-                  appointments.error instanceof Error ? appointments.error.message : "Could not load appointments"
+                  appointments.error instanceof Error
+                    ? appointments.error.message
+                    : "Could not load appointments"
                 }
                 onRetry={() => appointments.refetch()}
               />
             ) : list.length === 0 ? (
-              <EmptyState title="No appointments recorded" description="Patient bookings will populate in real time." />
+              <EmptyState
+                title="No appointments recorded"
+                description="Patient bookings will populate in real time."
+              />
             ) : (
               <div className="overflow-x-auto rounded-2xl border border-border/60">
                 <table className="w-full min-w-[700px] text-sm text-left">
@@ -316,7 +364,9 @@ function ManagerDashboard() {
                           {appointment.patient_name ?? personName(appointment.customer)}
                         </td>
                         <td className="py-3.5 px-4 text-xs font-medium text-foreground">
-                          {appointment.doctor_name ? `Dr. ${appointment.doctor_name}` : personName(appointment.doctor)}
+                          {appointment.doctor_name
+                            ? `Dr. ${appointment.doctor_name}`
+                            : personName(appointment.doctor)}
                         </td>
                         <td className="py-3.5 px-4 text-xs text-muted-foreground max-w-[200px] truncate">
                           {appointment.reason ?? "—"}

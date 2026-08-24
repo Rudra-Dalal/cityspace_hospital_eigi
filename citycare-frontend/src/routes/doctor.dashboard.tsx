@@ -38,7 +38,10 @@ export const Route = createFileRoute("/doctor/dashboard")({
   head: () => ({
     meta: [
       { title: "Doctor schedule — CityCare" },
-      { name: "description", content: "Your CityCare consulting schedule, appointment volume and profile details." },
+      {
+        name: "description",
+        content: "Your CityCare consulting schedule, appointment volume and profile details.",
+      },
       { property: "og:title", content: "Doctor schedule — CityCare" },
       { property: "og:description", content: "Today's clinic at a glance, plus the week ahead." },
     ],
@@ -95,13 +98,21 @@ function DoctorDashboard() {
         />
         <StatCard
           label="Upcoming Visits"
-          value={statsData ? ((statsData["upcoming_visits"] as number) ?? upcoming.length) : upcoming.length}
+          value={
+            statsData
+              ? ((statsData["upcoming_visits"] as number) ?? upcoming.length)
+              : upcoming.length
+          }
           icon={<CalendarDays className="h-4 w-4" />}
           hint="Next 7 days"
         />
         <StatCard
           label="Total Consultations"
-          value={statsData ? ((statsData["total_patients"] as number) ?? appointments.length) : appointments.length}
+          value={
+            statsData
+              ? ((statsData["total_patients"] as number) ?? appointments.length)
+              : appointments.length
+          }
           icon={<Users className="h-4 w-4" />}
           hint="All time recorded"
         />
@@ -125,7 +136,11 @@ function DoctorDashboard() {
               <LoadingRows rows={2} />
             ) : schedule.isError ? (
               <ErrorNote
-                message={schedule.error instanceof Error ? schedule.error.message : "Could not load schedule"}
+                message={
+                  schedule.error instanceof Error
+                    ? schedule.error.message
+                    : "Could not load schedule"
+                }
                 onRetry={() => schedule.refetch()}
               />
             ) : today.length === 0 ? (
@@ -142,7 +157,9 @@ function DoctorDashboard() {
                       onAccept={() => accept.mutate(appointment.id)}
                       accepting={accept.isPending && accept.variables === appointment.id}
                       onPrescribe={() =>
-                        setPrescribing((curr) => (curr === String(appointment.id) ? null : String(appointment.id)))
+                        setPrescribing((curr) =>
+                          curr === String(appointment.id) ? null : String(appointment.id),
+                        )
                       }
                       isPrescribing={prescribing === String(appointment.id)}
                     />
@@ -185,7 +202,9 @@ function DoctorDashboard() {
                     Dr. {user?.first_name} {user?.last_name}
                   </p>
                   <p className="text-primary font-semibold">
-                    {String(profile["specialization"] || user?.specialization || "General Medicine")}
+                    {String(
+                      profile["specialization"] || user?.specialization || "General Medicine",
+                    )}
                   </p>
                 </div>
               </div>
@@ -193,14 +212,18 @@ function DoctorDashboard() {
               {profile["qualification"] || user?.qualification ? (
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">Qualification:</span>
-                  <span className="font-medium text-foreground">{String(profile["qualification"] || user?.qualification)}</span>
+                  <span className="font-medium text-foreground">
+                    {String(profile["qualification"] || user?.qualification)}
+                  </span>
                 </div>
               ) : null}
 
               {profile["working_hours"] || user?.working_hours ? (
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">Hours:</span>
-                  <span className="font-medium text-foreground">{String(profile["working_hours"] || user?.working_hours)}</span>
+                  <span className="font-medium text-foreground">
+                    {String(profile["working_hours"] || user?.working_hours)}
+                  </span>
                 </div>
               ) : null}
 
@@ -237,7 +260,10 @@ function DoctorAppointmentItem({
   const isBooked = (appointment.status ?? "").toLowerCase() === "booked";
   const isAccepted = (appointment.status ?? "").toLowerCase() === "accepted";
   const patient = appointment.customer || {};
-  const patientName = appointment.patient_name || `${patient.first_name || ""} ${patient.last_name || ""}`.trim() || "Patient";
+  const patientName =
+    appointment.patient_name ||
+    `${patient.first_name || ""} ${patient.last_name || ""}`.trim() ||
+    "Patient";
   const symptoms = appointment.symptoms ?? [];
 
   return (
@@ -249,7 +275,9 @@ function DoctorAppointmentItem({
               <span className="grid h-7 w-7 place-items-center rounded-full bg-secondary text-foreground text-xs font-bold">
                 <User className="h-4 w-4 text-primary" />
               </span>
-              <h4 className="font-display font-bold text-base text-foreground leading-tight">{patientName}</h4>
+              <h4 className="font-display font-bold text-base text-foreground leading-tight">
+                {patientName}
+              </h4>
             </div>
 
             <div className="mt-2 flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
