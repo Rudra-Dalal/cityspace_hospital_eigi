@@ -247,6 +247,10 @@ The Telegram Patient Assistant (`telegram_gateway/`) allows patients to discover
 
 ### Running the Telegram Gateway
 
+**Bot Details:**
+- **Username:** `@citycare_hospital_bot`
+- **Direct Link:** [https://t.me/citycare_hospital_bot](https://t.me/citycare_hospital_bot)
+
 **Local Development (Polling Mode):**
 ```bash
 python -m telegram_gateway.poller

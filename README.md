@@ -177,6 +177,7 @@ Both the Super Admin and the branch Hospital Manager can tune doctor schedules:
 
 A dedicated, isolated conversational gateway (`telegram_gateway/`) for patients built on Hermes Agent architecture principles:
 
+- **Bot Username**: `@citycare_hospital_bot` ([https://t.me/citycare_hospital_bot](https://t.me/citycare_hospital_bot))
 - **Transport Separation**: Dedicated local polling process (`python run_telegram_poller.py`) and FastAPI Webhook (`POST /telegram/webhook`) for production.
 - **Persistent Sessions**: MongoDB persistent session state (`telegram_sessions`) with deterministic keys (`tg:private:<chat_id>:0`) and TTL expiry.
 - **1-to-1 Identity Mapping**: Salted OTP verification linking Telegram numeric user IDs to patient accounts.
