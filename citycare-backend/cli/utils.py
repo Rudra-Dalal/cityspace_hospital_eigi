@@ -51,6 +51,8 @@ async def load_current_user(token: Optional[str]) -> Optional[Dict[str, Any]]:
         db = get_database()
         user = await db.users.find_one({"_id": ObjectId(user_id)})
         if user:
+            if user.get("is_active") is False:
+                return None
             user["id"] = str(user["_id"])
         return user
     except (InvalidId, RuntimeError, Exception):

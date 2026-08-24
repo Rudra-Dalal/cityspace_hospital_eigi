@@ -33,9 +33,9 @@ class AppointmentCreate(BaseModel):
     @field_validator("slot")
     @classmethod
     def validate_slot(cls, v: str) -> str:
-        if v not in VALID_SLOTS:
-            raise ValueError(f"slot must be one of: {', '.join(VALID_SLOTS)}")
-        return v
+        if not re.fullmatch(r"^\d{2}:\d{2}$", v.strip()):
+            raise ValueError("slot must be in HH:MM format (e.g. 10:00)")
+        return v.strip()
 
     @field_validator("reason")
     @classmethod

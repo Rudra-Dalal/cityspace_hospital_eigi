@@ -154,6 +154,32 @@ async def list_users(role: Optional[str] = None, hospital_id: Optional[str] = No
     return [UserOut(**serialize_user(u)) for u in users]
 
 
+async def update_doctor(doctor_id: str, payload: "DoctorUpdate") -> UserOut:
+    """Super admin updates doctor profile/availability configuration."""
+    from app.core.database import get_database
+    from datetime import datetime, timezone
+    from pymongo import ReturnDocument
+    db = get_database()
+    try:
+        oid = ObjectId(doctor_id)
+    except Exception:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid doctor ID.")
+
+    updates = {k: v for k, v in payload.model_dump().items() if v is not None}
+    if not updates:
+        raise HTTPException(status_code=422, detail="No fields to update.")
+    updates["updated_at"] = datetime.now(timezone.utc)
+
+    updated = await db.users.find_one_and_update(
+        {"_id": oid, "role": UserRole.DOCTOR.value},
+        {"$set": updates},
+        return_document=ReturnDocument.AFTER,
+    )
+    if not updated:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Doctor not found.")
+    return UserOut(**serialize_user(updated))
+
+
 async def deactivate_user(user_id: str) -> UserOut:
     """Soft-deactivate a user by setting is_active=False."""
     from app.core.database import get_database

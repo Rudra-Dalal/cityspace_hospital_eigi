@@ -147,3 +147,36 @@ class CreateDoctorRequest(BaseModel):
         if not re.fullmatch(r"\+91[6-9]\d{9}", v):
             raise ValueError("mobile must match +91 followed by a 10-digit Indian number")
         return v
+
+    @field_validator("available_days")
+    @classmethod
+    def validate_days(cls, v: Optional[List[str]]) -> Optional[List[str]]:
+        if v is None:
+            return v
+        valid_days = {"Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"}
+        for day in v:
+            if day not in valid_days:
+                raise ValueError(f"Invalid weekday: {day}. Must be one of {', '.join(sorted(valid_days))}")
+        return v
+
+
+class DoctorUpdate(BaseModel):
+    """Update doctor profile and availability configuration."""
+    qualification: Optional[str] = None
+    specialization: Optional[str] = None
+    available_days: Optional[List[str]] = None
+    working_hours: Optional[str] = None
+    valid_slots: Optional[List[str]] = None
+    slot_duration_minutes: Optional[int] = None
+    is_active: Optional[bool] = None
+
+    @field_validator("available_days")
+    @classmethod
+    def validate_days(cls, v: Optional[List[str]]) -> Optional[List[str]]:
+        if v is None:
+            return v
+        valid_days = {"Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"}
+        for day in v:
+            if day not in valid_days:
+                raise ValueError(f"Invalid weekday: {day}. Must be one of {', '.join(sorted(valid_days))}")
+        return v

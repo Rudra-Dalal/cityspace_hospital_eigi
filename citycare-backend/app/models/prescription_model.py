@@ -16,11 +16,18 @@ def prescription_document(*, patient_id: str, doctor_id: str, appointment_id: st
 
 
 def serialize_prescription(doc: Dict[str, Any], *, doctor_name: str | None = None) -> Dict[str, Any]:
-    payload = {"id": str(doc["_id"]), "patient_id": doc["patient_id"], "doctor_id": doc["doctor_id"],
-               "appointment_id": doc["appointment_id"], "diagnosis": doc["diagnosis"],
-               "medicines": doc.get("medicines", []), "general_instructions": doc.get("general_instructions", ""),
-               "created_at": doc.get("created_at"), "updated_at": doc.get("updated_at"),
-               "pdf_url": doc.get("pdf_url"), "cloudinary_public_id": doc.get("cloudinary_public_id")}
+    payload = {
+        "id": str(doc["_id"]),
+        "patient_id": doc["patient_id"],
+        "doctor_id": doc["doctor_id"],
+        "appointment_id": doc["appointment_id"],
+        "diagnosis": doc["diagnosis"],
+        "medicines": doc.get("medicines", []),
+        "general_instructions": doc.get("general_instructions", ""),
+        "created_at": doc.get("created_at"),
+        "updated_at": doc.get("updated_at"),
+        "pdf_url": doc.get("pdf_url"),
+    }
     if doctor_name is not None:
         payload["doctor_name"] = doctor_name
     return payload

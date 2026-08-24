@@ -49,5 +49,4 @@ class PrescriptionOut(BaseModel):
     created_at: Optional[datetime] = None
     updated_at: Optional[datetime] = None
     pdf_url: Optional[str] = None
-    cloudinary_public_id: Optional[str] = None
     doctor_name: Optional[str] = None

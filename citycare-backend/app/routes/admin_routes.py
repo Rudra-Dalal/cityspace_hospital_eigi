@@ -8,7 +8,7 @@ from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from app.controllers import admin_controller
 from app.core.security import get_current_user, require_role
 from app.schemas.hospital_schema import HospitalCreate, HospitalOut, HospitalUpdate
-from app.schemas.user_schema import CreateDoctorRequest, CreateManagerRequest, UserOut
+from app.schemas.user_schema import CreateDoctorRequest, CreateManagerRequest, DoctorUpdate, UserOut
 
 router = APIRouter(prefix="/admin", tags=["Super Admin"])
 
@@ -65,6 +65,15 @@ async def create_doctor(
     current_user=_require_super_admin,
 ):
     return await admin_controller.create_doctor(payload, created_by=current_user["id"])
+
+
+@router.patch("/doctors/{doctor_id}", response_model=UserOut)
+async def update_doctor(
+    doctor_id: str,
+    payload: DoctorUpdate,
+    current_user=_require_super_admin,
+):
+    return await admin_controller.update_doctor(doctor_id, payload)
 
 
 @router.get("/users", response_model=List[UserOut])

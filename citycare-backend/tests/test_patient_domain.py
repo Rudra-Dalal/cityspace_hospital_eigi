@@ -468,3 +468,269 @@ async def test_manager_cannot_change_hospital_status(client: AsyncClient):
     h_db = await client.get(f"/patient/hospitals/{h_id}")
     assert h_db.status_code == 200
     assert h_db.json()["status"] == "active"
+
+
+@pytest.mark.asyncio
+async def test_invalid_weekday_and_invalid_slot_booking(client: AsyncClient):
+    """Test validation when booking on an invalid weekday or unconfigured slot."""
+    admin_token = (await login(client, "admin@citycare.clinic", "Admin@123"))["access_token"]
+    await signup_patient(client, "slot_tester@example.com")
+    pt_token = (await login(client, "slot_tester@example.com", "Patient@123"))["access_token"]
+
+    # Create Hospital
+    res_h = await client.post(
+        "/admin/hospitals",
+        json={"name": "Weekday Test Hospital", "address": "123 Weekday Street", "city": "Nagpur", "state": "Maharashtra", "contact_phone": "+919100000088", "contact_email": "w@hosp.com", "status": "active"},
+        headers=auth_header(admin_token),
+    )
+    assert res_h.status_code == 201
+    h_id = res_h.json()["id"]
+
+    # Create Doctor configured to work only on Tuesdays and Thursdays from 10:00 to 12:00
+    res_doc = await client.post(
+        "/admin/users/doctor",
+        json={
+            "first_name": "Weekday",
+            "last_name": "Doctor",
+            "email": "dr.weekday@hosp.com",
+            "mobile": "+919876500088",
+            "password": "Doctor@123",
+            "hospital_id": h_id,
+            "available_days": ["Tuesday", "Thursday"],
+            "valid_slots": ["10:00", "10:30", "11:00", "11:30"],
+        },
+        headers=auth_header(admin_token),
+    )
+    assert res_doc.status_code == 201
+    doc_id = res_doc.json()["id"]
+
+    # Find the next Friday and next Tuesday within 7 days
+    today = datetime.now(timezone.utc).date()
+    target_friday = None
+    target_tuesday = None
+    for offset in range(1, 8):
+        d = today + timedelta(days=offset)
+        if d.strftime("%A") == "Friday" and target_friday is None:
+            target_friday = d.isoformat()
+        if d.strftime("%A") == "Tuesday" and target_tuesday is None:
+            target_tuesday = d.isoformat()
+
+    # 1. Booking on Friday (off-day) fails with 400
+    if target_friday:
+        res_off_day = await client.post(
+            "/appointments",
+            json={"hospital_id": h_id, "doctor_id": doc_id, "date": target_friday, "slot": "10:00", "reason": "Off-day checkup consultation"},
+            headers=auth_header(pt_token),
+        )
+        assert res_off_day.status_code == 400
+        assert "not available on" in res_off_day.json()["detail"].lower()
+
+    # 2. Booking on Tuesday with an invalid/unconfigured slot (e.g. 15:00) fails with 400
+    if target_tuesday:
+        res_bad_slot = await client.post(
+            "/appointments",
+            json={"hospital_id": h_id, "doctor_id": doc_id, "date": target_tuesday, "slot": "15:00", "reason": "Bad-slot checkup consultation"},
+            headers=auth_header(pt_token),
+        )
+        assert res_bad_slot.status_code == 400
+        assert "invalid slot for this doctor" in res_bad_slot.json()["detail"].lower()
+
+        # 3. Booking on Tuesday with valid slot (10:30) succeeds
+        res_valid = await client.post(
+            "/appointments",
+            json={"hospital_id": h_id, "doctor_id": doc_id, "date": target_tuesday, "slot": "10:30", "reason": "Valid checkup consultation"},
+            headers=auth_header(pt_token),
+        )
+        assert res_valid.status_code == 201
+
+
+@pytest.mark.asyncio
+async def test_inactive_doctor_rejected_on_availability_and_booking(client: AsyncClient):
+    """Test that deactivated doctors are excluded from discovery, availability, and booking."""
+    admin_token = (await login(client, "admin@citycare.clinic", "Admin@123"))["access_token"]
+    await signup_patient(client, "inactive_doc_tester@example.com")
+    pt_token = (await login(client, "inactive_doc_tester@example.com", "Patient@123"))["access_token"]
+
+    res_h = await client.post(
+        "/admin/hospitals",
+        json={"name": "Active Hospital for Inactive Doc", "address": "123 Doctor Street", "city": "Nagpur", "state": "Maharashtra", "contact_phone": "+919100000099", "contact_email": "hdoc@hosp.com", "status": "active"},
+        headers=auth_header(admin_token),
+    )
+    assert res_h.status_code == 201
+    h_id = res_h.json()["id"]
+
+    res_doc = await client.post(
+        "/admin/users/doctor",
+        json={"first_name": "ToDeactivate", "last_name": "Doctor", "email": "dr.todeactivate@hosp.com", "mobile": "+919876500099", "password": "Doctor@123", "hospital_id": h_id},
+        headers=auth_header(admin_token),
+    )
+    assert res_doc.status_code == 201
+    doc_id = res_doc.json()["id"]
+
+    # Deactivate the doctor
+    res_deact = await client.patch(f"/admin/users/{doc_id}/deactivate", headers=auth_header(admin_token))
+    assert res_deact.status_code == 200
+    assert res_deact.json()["is_active"] is False
+
+    # 1. Doctor is excluded from public doctors list
+    res_docs = await client.get(f"/patient/doctors?hospital_id={h_id}")
+    assert res_docs.status_code == 200
+    assert not any(d["id"] == doc_id for d in res_docs.json())
+
+    # 2. Availability endpoint returns 404
+    res_avail = await client.get(f"/patient/doctors/{doc_id}/availability?date={today_iso()}")
+    assert res_avail.status_code == 404
+
+    # 3. Booking appointment with inactive doctor fails with 400
+    res_book = await client.post(
+        "/appointments",
+        json={"hospital_id": h_id, "doctor_id": doc_id, "date": today_iso(), "slot": "10:00", "reason": "Inactive doc consultation check"},
+        headers=auth_header(pt_token),
+    )
+    assert res_book.status_code == 400
+    assert "doctor is invalid or inactive" in res_book.json()["detail"].lower()
+
+
+@pytest.mark.asyncio
+async def test_admin_and_manager_configure_doctor_availability(client: AsyncClient):
+    """Test authorized admin and hospital manager updating doctor availability configuration."""
+    admin_token = (await login(client, "admin@citycare.clinic", "Admin@123"))["access_token"]
+
+    # Create Hospital A and Hospital B
+    res_ha = await client.post(
+        "/admin/hospitals",
+        json={"name": "Doctor Config Hospital A", "address": "123 Alpha Road", "city": "Pune", "state": "MH", "contact_phone": "+919100000071", "contact_email": "ha_cfg@hosp.com", "status": "active"},
+        headers=auth_header(admin_token),
+    )
+    assert res_ha.status_code == 201
+    ha_id = res_ha.json()["id"]
+
+    res_hb = await client.post(
+        "/admin/hospitals",
+        json={"name": "Doctor Config Hospital B", "address": "456 Beta Road", "city": "Pune", "state": "MH", "contact_phone": "+919100000072", "contact_email": "hb_cfg@hosp.com", "status": "active"},
+        headers=auth_header(admin_token),
+    )
+    assert res_hb.status_code == 201
+    hb_id = res_hb.json()["id"]
+
+    # Create Manager for Hospital A and Hospital B
+    res_ma = await client.post(
+        "/admin/users/manager",
+        json={"first_name": "Manager", "last_name": "A", "email": "mgr_a_cfg@hosp.com", "mobile": "+919876577771", "password": "Manager@123", "hospital_id": ha_id},
+        headers=auth_header(admin_token),
+    )
+    assert res_ma.status_code == 201
+    mgr_a_token = (await login(client, "mgr_a_cfg@hosp.com", "Manager@123"))["access_token"]
+
+    res_mb = await client.post(
+        "/admin/users/manager",
+        json={"first_name": "Manager", "last_name": "B", "email": "mgr_b_cfg@hosp.com", "mobile": "+919876577772", "password": "Manager@123", "hospital_id": hb_id},
+        headers=auth_header(admin_token),
+    )
+    assert res_mb.status_code == 201
+    mgr_b_token = (await login(client, "mgr_b_cfg@hosp.com", "Manager@123"))["access_token"]
+
+    # Create Doctor at Hospital A
+    res_doc = await client.post(
+        "/admin/users/doctor",
+        json={"first_name": "Suresh", "last_name": "Patil", "email": "dr.suresh@hospa.com", "mobile": "+919876577773", "password": "Doctor@123", "hospital_id": ha_id},
+        headers=auth_header(admin_token),
+    )
+    assert res_doc.status_code == 201
+    doc_id = res_doc.json()["id"]
+
+    # 1. Hospital Manager A updates Doctor A availability
+    res_mgr_update = await client.patch(
+        f"/manager/doctors/{doc_id}",
+        json={
+            "available_days": ["Monday", "Wednesday", "Friday"],
+            "working_hours": "09:00 - 15:00",
+            "valid_slots": ["09:00", "09:30", "10:00"],
+        },
+        headers=auth_header(mgr_a_token),
+    )
+    assert res_mgr_update.status_code == 200
+    assert res_mgr_update.json()["available_days"] == ["Monday", "Wednesday", "Friday"]
+    assert res_mgr_update.json()["valid_slots"] == ["09:00", "09:30", "10:00"]
+
+    # 2. Manager B attempting to update Doctor A (cross-hospital) fails with 404
+    res_cross_mgr = await client.patch(
+        f"/manager/doctors/{doc_id}",
+        json={"valid_slots": ["10:00"]},
+        headers=auth_header(mgr_b_token),
+    )
+    assert res_cross_mgr.status_code == 404
+
+    # 3. Super Admin updates Doctor A configuration
+    res_admin_update = await client.patch(
+        f"/admin/doctors/{doc_id}",
+        json={"specialization": "Senior Cardiologist", "valid_slots": ["09:00", "10:00", "11:00"]},
+        headers=auth_header(admin_token),
+    )
+    assert res_admin_update.status_code == 200
+    assert res_admin_update.json()["specialization"] == "Senior Cardiologist"
+
+    # 4. Invalid weekday name fails validation with 422
+    res_invalid_day = await client.patch(
+        f"/admin/doctors/{doc_id}",
+        json={"available_days": ["Funday"]},
+        headers=auth_header(admin_token),
+    )
+    assert res_invalid_day.status_code == 422
+
+
+@pytest.mark.asyncio
+async def test_deactivated_cli_user_rejected(client: AsyncClient):
+    """Test that CLI authentication rejects deactivated users."""
+    from cli.utils import load_current_user
+    from app.core.security import create_access_token
+    from app.core.database import get_database
+
+    db = get_database()
+    # Create active user token
+    user = await db.users.find_one({"email": "admin@citycare.clinic"})
+    assert user is not None
+    token = create_access_token({"sub": str(user["_id"]), "email": user["email"], "role": user["role"]})
+
+    # Active user loads correctly
+    loaded = await load_current_user(token)
+    assert loaded is not None
+    assert loaded["email"] == "admin@citycare.clinic"
+
+    # Temporarily set is_active=False
+    await db.users.update_one({"_id": user["_id"]}, {"$set": {"is_active": False}})
+    try:
+        loaded_deact = await load_current_user(token)
+        assert loaded_deact is None  # Deactivated user returns None
+    finally:
+        await db.users.update_one({"_id": user["_id"]}, {"$set": {"is_active": True}})
+
+
+@pytest.mark.asyncio
+async def test_legacy_records_and_idempotent_migration(client: AsyncClient):
+    """Test graceful handling of legacy records and migration idempotency."""
+    from app.core.migrate import run_migrations
+    from app.core.database import get_database
+
+    db = get_database()
+
+    # 1. Create a deliberately inactive user without is_active in another record
+    res_delib = await db.users.insert_one({
+        "first_name": "Deliberately",
+        "last_name": "Inactive",
+        "email": "delib_inactive@example.com",
+        "mobile": "+919876599990",
+        "role": "customer",
+        "is_active": False,
+    })
+
+    # 2. Run migrations again
+    await run_migrations()
+
+    # 3. Verify deliberately inactive user was NOT reactivated
+    delib_user = await db.users.find_one({"_id": res_delib.inserted_id})
+    assert delib_user is not None
+    assert delib_user["is_active"] is False  # Must remain False!
+
+    # Cleanup
+    await db.users.delete_one({"_id": res_delib.inserted_id})
