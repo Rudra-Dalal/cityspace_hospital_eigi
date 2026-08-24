@@ -54,6 +54,40 @@ async def login(payload: LoginRequest) -> TokenResponse:
     )
 
 
+async def set_password_with_token(token: str, new_password: str) -> dict:
+    """Validate activation token, update user password hash, and invalidate token."""
+    patient_id = await registration_service.verify_and_consume_activation_token(token)
+    if not patient_id:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid, expired, or already-used activation token.",
+        )
+
+    user = await user_crud.get_user_by_id(patient_id)
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Patient account not found.",
+        )
+
+    if len(new_password) < 8:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Password must be at least 8 characters long.",
+        )
+
+    new_hash = hash_password(new_password)
+    from app.core.database import get_database
+    db = get_database()
+    await db.users.update_one(
+        {"_id": user["_id"]},
+        {"$set": {"password_hash": new_hash}},
+    )
+    logger.info("Password set successfully via activation token for user_id=%s", patient_id)
+    return {"message": "Password set successfully. You can now log in."}
+
+
+
 async def seed_doctor_if_missing() -> None:
     """Create the single seeded doctor + super-admin accounts if missing."""
     settings = get_settings()

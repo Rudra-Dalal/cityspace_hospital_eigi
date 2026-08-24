@@ -16,6 +16,8 @@ os.environ.setdefault("DOCTOR_EMAIL", "doctor@citycare.clinic")
 os.environ.setdefault("DOCTOR_PASSWORD", "Doctor@123")
 os.environ.setdefault("DOCTOR_FIRST_NAME", "Meera")
 os.environ.setdefault("DOCTOR_LAST_NAME", "Kulkarni")
+os.environ["GEMINI_API_KEY"] = ""
+
 
 from app.core.config import get_settings
 from app.core.database import close_mongo_connection, connect_to_mongo, ensure_indexes, get_database

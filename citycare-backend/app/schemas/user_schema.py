@@ -41,6 +41,12 @@ class LoginRequest(BaseModel):
     password: str = Field(..., min_length=1)
 
 
+class SetPasswordRequest(BaseModel):
+    token: str = Field(..., min_length=16, description="One-time activation / password setup token")
+    new_password: str = Field(..., min_length=8, max_length=128)
+
+
+
 class UserOut(BaseModel):
     id: str
     first_name: str

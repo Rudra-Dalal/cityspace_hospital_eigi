@@ -74,7 +74,8 @@ Simply type any health inquiry, clinic policy question, or medication query in c
 async def _claim_update_idempotency(update_id: int) -> bool:
     """
     Atomically claim an update ID to prevent duplicate processing across retries/workers.
-    Returns True if claimed, False if already processed or processing.
+    Allows retrying updates that previously failed, but rejects duplicates that are processing or completed.
+    Returns True if claimed, False if duplicate/in-progress/completed.
     """
     try:
         db = get_database()
@@ -85,7 +86,26 @@ async def _claim_update_idempotency(update_id: int) -> bool:
     expires_at = now + timedelta(hours=24)
 
     try:
-        # Atomic insert to claim
+        # 1. If this update previously failed, allow retry
+        retry_record = await db.telegram_idempotency.find_one_and_update(
+            {
+                "update_id": update_id,
+                "status": TelegramIdempotencyStatus.FAILED.value,
+            },
+            {
+                "$set": {
+                    "status": TelegramIdempotencyStatus.PROCESSING.value,
+                    "processed_at": now,
+                    "expires_at": expires_at,
+                    "error": None,
+                }
+            },
+        )
+        if retry_record:
+            logger.info("Retrying previously failed Telegram update %s", update_id)
+            return True
+
+        # 2. Otherwise insert as new processing record
         await db.telegram_idempotency.insert_one({
             "update_id": update_id,
             "status": TelegramIdempotencyStatus.PROCESSING.value,
@@ -99,6 +119,7 @@ async def _claim_update_idempotency(update_id: int) -> bool:
     except Exception as exc:
         logger.error("Idempotency database error: %s", exc)
         return True
+
 
 
 async def _mark_update_completed(update_id: int, status: str = TelegramIdempotencyStatus.COMPLETED.value, error: Optional[str] = None) -> None:

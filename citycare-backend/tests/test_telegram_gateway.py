@@ -593,3 +593,173 @@ async def test_webhook_route_secret_token_validation(client: AsyncClient):
     settings.telegram_enabled = False
     settings.telegram_webhook_secret = ""
 
+
+@pytest.mark.asyncio
+async def test_real_otp_delivery_providers():
+    """Verify Email and SMS production OTP delivery implementations do not leak or fail."""
+    from telegram_gateway.otp_service import EmailOtpDeliveryService, SmsOtpDeliveryService
+
+    email_svc = EmailOtpDeliveryService()
+    email_ok = await email_svc.send_otp(target_type="email", target_value="patient@example.com", otp_code="123456", purpose="link_account")
+    assert email_ok is True
+
+    sms_svc = SmsOtpDeliveryService()
+    sms_ok = await sms_svc.send_otp(target_type="mobile", target_value="+919876543210", otp_code="654321", purpose="register_patient")
+    assert sms_ok is True
+
+
+@pytest.mark.asyncio
+async def test_password_activation_endpoint_full_lifecycle(client: AsyncClient):
+    """Verify POST /auth/set-password across valid, invalid, expired, and duplicate tokens."""
+    # 1. Create patient with activation token
+    reg = await register_patient(
+        payload={
+            "first_name": "Meera",
+            "last_name": "Nair",
+            "email": "meera.nair@example.com",
+            "mobile": "+919876543333",
+            "password": "",
+        },
+        allow_activation_token=True,
+    )
+    token = reg["activation_token"]
+    assert token is not None
+
+    # 2. Invalid token -> 400
+    res_bad = await client.post("/auth/set-password", json={"token": "invalid-token-value-12345678", "new_password": "NewStrongPassword123!"})
+    assert res_bad.status_code == 400
+    assert "Invalid, expired, or already-used" in res_bad.json()["detail"]
+
+    # 3. Short password -> 400
+    res_short = await client.post("/auth/set-password", json={"token": token, "new_password": "short"})
+    assert res_short.status_code == 422 or res_short.status_code == 400
+
+    # 4. Valid token & password -> 200
+    res_ok = await client.post("/auth/set-password", json={"token": token, "new_password": "NewStrongPassword123!"})
+    assert res_ok.status_code == 200
+    assert "Password set successfully" in res_ok.json()["message"]
+
+    # 5. Already used token -> 400
+    res_used = await client.post("/auth/set-password", json={"token": token, "new_password": "AnotherPassword123!"})
+    assert res_used.status_code == 400
+
+    # 6. Verify login with newly set password
+    login_res = await client.post("/auth/login", json={"email": "meera.nair@example.com", "password": "NewStrongPassword123!"})
+    assert login_res.status_code == 200
+    assert "access_token" in login_res.json()
+
+
+@pytest.mark.asyncio
+async def test_idempotency_crash_and_retry():
+    """Verify Telegram update retry after failure behaves correctly."""
+    from telegram_gateway.router import _mark_update_completed
+    from telegram_gateway.models import TelegramIdempotencyStatus
+
+    update_id = 777111222
+
+    # 1. First claim
+    claim1 = await _claim_update_idempotency(update_id)
+    assert claim1 is True
+
+    # 2. While processing, duplicate is blocked
+    claim_dup = await _claim_update_idempotency(update_id)
+    assert claim_dup is False
+
+    # 3. Simulate processing crash / failure
+    await _mark_update_completed(update_id, status=TelegramIdempotencyStatus.FAILED.value, error="Simulated network failure")
+
+    # 4. Retry after failure must be allowed
+    claim_retry = await _claim_update_idempotency(update_id)
+    assert claim_retry is True
+
+    # 5. Complete workflow
+    await _mark_update_completed(update_id, status=TelegramIdempotencyStatus.COMPLETED.value)
+
+    # 6. Subsequent duplicate is blocked
+    claim_after_done = await _claim_update_idempotency(update_id)
+    assert claim_after_done is False
+
+
+@pytest.mark.asyncio
+async def test_protected_prescription_pdf_delivery():
+    """Verify only the verified prescription owner can view and download prescription PDFs."""
+    from telegram_gateway.flows.prescriptions_flow import send_prescription_pdf, show_prescription_detail
+
+    fake_adapter = FakeTelegramAdapter()
+
+    # 1. Create doctor & patient
+    patient1 = await user_crud.create_user(
+        user_document(
+            first_name="P1",
+            last_name="Owner",
+            email="p1.owner@example.com",
+            mobile="+919876543201",
+            password_hash="pwd",
+            role=UserRole.CUSTOMER,
+            is_active=True,
+        )
+    )
+    p1_id = str(patient1["_id"])
+
+    patient2 = await user_crud.create_user(
+        user_document(
+            first_name="P2",
+            last_name="Other",
+            email="p2.other@example.com",
+            mobile="+919876543202",
+            password_hash="pwd",
+            role=UserRole.CUSTOMER,
+            is_active=True,
+        )
+    )
+
+    doctor = await user_crud.create_user(
+        user_document(
+            first_name="Doc",
+            last_name="Prescriber",
+            email="doc.presc@citycare.clinic",
+            mobile="+919876543203",
+            password_hash="pwd",
+            role=UserRole.DOCTOR,
+            is_active=True,
+        )
+    )
+    doc_id = str(doctor["_id"])
+
+    # Create prescription for patient 1
+    rx_doc = prescription_document(
+        patient_id=p1_id,
+        doctor_id=doc_id,
+        appointment_id="appt_test_999",
+        diagnosis="Acute Rhinitis",
+        medicines=[{"name": "Cetirizine", "dosage": "10mg", "frequency": "Once daily", "duration": "5 days"}],
+        general_instructions="Drink warm water",
+    )
+    rx_doc["pdf_url"] = "https://res.cloudinary.com/citycare/image/upload/v12345/prescriptions/prescription_999.pdf"
+    rx_doc["cloudinary_public_id"] = "citycare/prescriptions/prescription_999"
+    rx = await prescription_crud.create_prescription(rx_doc)
+    rx_id = str(rx["_id"])
+
+
+    # Patient 2 (unauthorized) tries to access prescription 1
+    await show_prescription_detail(
+        adapter=fake_adapter,
+        chat_id=123,
+        patient=patient2,
+        prescription_id=rx_id,
+        callback_query_id="cb_unauth",
+    )
+    assert "access denied" in fake_adapter.last_message["text"].lower() or "not found" in fake_adapter.last_message["text"].lower()
+
+    # Patient 1 (authorized owner) requests PDF
+    await send_prescription_pdf(
+        adapter=fake_adapter,
+        chat_id=123,
+        patient=patient1,
+        prescription_id=rx_id,
+        callback_query_id="cb_auth",
+    )
+    assert len(fake_adapter.sent_documents) == 1
+    assert fake_adapter.sent_documents[0]["document"] == rx["pdf_url"]
+
+

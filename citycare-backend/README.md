@@ -276,11 +276,11 @@ Run the complete backend test suite:
 ```
 
 ### Current Test Suite Status
-- **Total Tests Executed**: **115**
-- **Passed**: **115 (100%)**
+- **Total Tests Executed**: **119**
+- **Passed**: **119 (100%)**
 - **Failed**: **0**
 - **Test Modules**:
-  - `tests/test_telegram_gateway.py`: 12 passed
+  - `tests/test_telegram_gateway.py`: 16 passed
   - `tests/test_patient_domain.py`: 12 passed
   - `tests/test_cli.py`: 40 passed
   - `tests/test_ai_chat.py`: 17 passed
