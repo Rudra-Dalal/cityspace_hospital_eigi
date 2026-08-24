@@ -38,6 +38,7 @@ async def client():
     await connect_to_mongo()
     await ensure_indexes()
     db = get_database()
+    await db.hospitals.delete_many({})
     await db.users.delete_many({})
     await db.appointments.delete_many({})
     await db.prescriptions.delete_many({})
@@ -49,6 +50,7 @@ async def client():
     async with AsyncClient(transport=transport, base_url="http://test") as ac:
         yield ac
 
+    await db.hospitals.delete_many({})
     await db.users.delete_many({})
     await db.appointments.delete_many({})
     await db.prescriptions.delete_many({})

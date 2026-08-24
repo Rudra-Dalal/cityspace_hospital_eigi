@@ -60,7 +60,8 @@ async def test_rag_retrieval_is_scoped_to_the_authenticated_patient(client):
 async def test_patient_chat_uses_authenticated_identity_for_retrieval():
     from app.ai.patient_service import run_patient_chat
 
-    with patch("app.ai.patient_service.retrieve_for_patient", new=AsyncMock(return_value=[])) as retrieve:
+    with patch("app.ai.patient_service.retrieve_for_patient", new=AsyncMock(return_value=[])) as retrieve, \
+         patch("app.ai.patient_service.retrieve_handbook_context", new=AsyncMock(return_value=[])):
         reply, sources = await run_patient_chat("What did another patient receive?", {"_id": "patient-a"})
 
     retrieve.assert_awaited_once_with("patient-a", "What did another patient receive?")

@@ -6,7 +6,7 @@ from fastapi import APIRouter, Depends
 
 from app.controllers import manager_controller
 from app.core.security import require_role
-from app.schemas.hospital_schema import HospitalOut, HospitalUpdate
+from app.schemas.hospital_schema import HospitalManagerUpdate, HospitalOut
 
 router = APIRouter(prefix="/manager", tags=["Hospital Manager"])
 
@@ -20,7 +20,7 @@ async def get_my_hospital(current_user=_require_manager):
 
 @router.patch("/hospital", response_model=HospitalOut)
 async def update_my_hospital(
-    payload: HospitalUpdate,
+    payload: HospitalManagerUpdate,
     current_user=_require_manager,
 ):
     return await manager_controller.update_my_hospital(current_user, payload)

@@ -10,7 +10,7 @@ from app.controllers.auth_controller import seed_doctor_if_missing
 from app.core.config import get_settings
 from app.core.database import close_mongo_connection, connect_to_mongo, ensure_indexes
 from app.core.migrate import run_migrations
-from app.routes import appointment_routes, auth_routes, doctor_routes
+from app.routes import appointment_routes, auth_routes, doctor_routes, patient_routes
 from app.routes import admin_routes, manager_routes, ai_routes, prescription_routes, patient_ai_routes, voice_routes
 from app.utils.logger import get_logger
 
@@ -55,12 +55,13 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Existing routes
+# Patient discovery and core routes
+app.include_router(patient_routes.router)
 app.include_router(auth_routes.router)
 app.include_router(doctor_routes.router)
 app.include_router(appointment_routes.router)
 
-# New multi-tenant routes
+# Multi-tenant and clinical routes
 app.include_router(admin_routes.router)
 app.include_router(manager_routes.router)
 app.include_router(ai_routes.router)

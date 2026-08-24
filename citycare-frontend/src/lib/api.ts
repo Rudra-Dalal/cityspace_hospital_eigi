@@ -12,6 +12,36 @@ export type User = {
   role: Role;
   hospital_id?: number | string | null;
   is_active?: boolean;
+  qualification?: string | null;
+  specialization?: string | null;
+  available_days?: string[] | null;
+  working_hours?: string | null;
+  valid_slots?: string[] | null;
+};
+
+export type DoctorPublicOut = {
+  id: string;
+  first_name: string;
+  last_name: string;
+  email: string;
+  mobile: string;
+  qualification: string;
+  specialization: string;
+  hospital_id: string;
+  hospital_name?: string | null;
+  hospital_city?: string | null;
+  available_days: string[];
+  working_hours: string;
+  slot_duration_minutes: number;
+};
+
+export type DoctorAvailabilityOut = {
+  doctor_id: string;
+  hospital_id: string;
+  date: string;
+  day_of_week: string;
+  is_available: boolean;
+  available_slots: string[];
 };
 
 export type Appointment = {
@@ -24,6 +54,8 @@ export type Appointment = {
   symptoms?: string[] | null;
   patient_name?: string | null;
   doctor_name?: string | null;
+  hospital_id?: string | null;
+  doctor_id?: string | null;
   customer?: Partial<User> | null;
   doctor?: Partial<User> | null;
 };
@@ -42,6 +74,10 @@ export type Hospital = {
   state?: string | null;
   contact_phone?: string | null;
   contact_email?: string | null;
+  facilities?: string[] | null;
+  services?: string[] | null;
+  working_hours?: string | null;
+  emergency_contact?: string | null;
   status?: string | null;
   is_active?: boolean;
 };
@@ -129,6 +165,21 @@ export const authApi = {
     apiFetch<LoginResponse>("/auth/login", { method: "POST", body, auth: false }),
 };
 
+export const patientApi = {
+  listHospitals: () => apiFetch<Hospital[]>("/patient/hospitals", { auth: false }),
+  getHospital: (id: string) => apiFetch<Hospital>(`/patient/hospitals/${id}`, { auth: false }),
+  listDoctors: (params?: { hospital_id?: string; specialization?: string }) => {
+    const search = new URLSearchParams();
+    if (params?.hospital_id) search.set("hospital_id", params.hospital_id);
+    if (params?.specialization) search.set("specialization", params.specialization);
+    const qs = search.toString();
+    return apiFetch<DoctorPublicOut[]>(`/patient/doctors${qs ? `?${qs}` : ""}`, { auth: false });
+  },
+  getDoctor: (id: string) => apiFetch<DoctorPublicOut>(`/patient/doctors/${id}`, { auth: false }),
+  getDoctorAvailability: (id: string, date: string) =>
+    apiFetch<DoctorAvailabilityOut>(`/patient/doctors/${id}/availability?date=${encodeURIComponent(date)}`, { auth: false }),
+};
+
 export const appointmentsApi = {
   freeSlots: (date: string) =>
     apiFetch<{ free_slots: string[] }>(`/appointments/free-slots?date=${encodeURIComponent(date)}`),
@@ -136,8 +187,10 @@ export const appointmentsApi = {
     date: string;
     slot: string;
     reason: string;
-    temperature: number;
-    symptoms: string[];
+    temperature?: number;
+    symptoms?: string[];
+    hospital_id?: string;
+    doctor_id?: string;
   }) => apiFetch<Appointment>("/appointments", { method: "POST", body }),
   mine: () => apiFetch<Appointment[]>("/appointments/my"),
   cancel: (id: number | string) =>

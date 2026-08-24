@@ -41,30 +41,39 @@ def get_database() -> AsyncIOMotorDatabase:
 async def ensure_indexes() -> None:
     """
     Create/update all MongoDB indexes.
-    Old single-doctor index (date, slot) is replaced by the multi-tenant index
-    (hospital_id, doctor_id, date, slot) WHERE status="booked".
+    All operations are idempotent and non-destructive.
     """
     db = get_database()
 
-    # Users — unique email
+    # 1. Users
     await db.users.create_index("email", unique=True, name="uniq_user_email")
+    await db.users.create_index(
+        [("hospital_id", 1), ("role", 1), ("is_active", 1)],
+        name="doctors_by_hospital",
+    )
+    await db.users.create_index(
+        [("role", 1), ("specialization", 1), ("is_active", 1)],
+        name="doctors_by_specialization",
+    )
 
-    # Hospitals — unique name+city composite (advisory, non-blocking)
+    # 2. Hospitals
     try:
         await db.hospitals.create_index(
             [("name", 1), ("city", 1)],
             unique=True,
             name="uniq_hospital_name_city",
         )
-    except Exception:
-        pass  # Index may already exist from prior run
+    except Exception as exc:
+        logger.debug("Hospitals unique composite index exists or notice: %s", exc)
 
-    # Appointments — drop legacy single-doctor index if it exists, then create multi-tenant one
+    await db.hospitals.create_index("status", name="hospital_status")
+
+    # 3. Appointments
     try:
         await db.appointments.drop_index("uniq_booked_date_slot")
         logger.info("Dropped legacy single-doctor appointment index")
     except Exception:
-        pass  # Doesn't exist — that's fine
+        pass  # Legacy index does not exist
 
     await db.appointments.create_index(
         [("hospital_id", 1), ("doctor_id", 1), ("date", 1), ("slot", 1)],
@@ -72,8 +81,21 @@ async def ensure_indexes() -> None:
         partialFilterExpression={"status": "booked"},
         name="uniq_booked_hospital_doctor_date_slot",
     )
+    await db.appointments.create_index(
+        [("patient_id", 1), ("created_at", -1)],
+        name="appointments_patient_recent",
+    )
+    await db.appointments.create_index(
+        [("doctor_id", 1), ("date", 1), ("slot", 1)],
+        name="appointments_doctor_date_slot",
+    )
+
+    # 4. Prescriptions
     await db.prescriptions.create_index("appointment_id", unique=True, name="uniq_prescription_appointment")
     await db.prescriptions.create_index([("patient_id", 1), ("created_at", -1)], name="prescription_patient_recent")
+    await db.prescriptions.create_index([("doctor_id", 1), ("created_at", -1)], name="prescription_doctor_recent")
+
+    # 5. RAG Vectors & Knowledge Chunks
     await db.prescription_vectors.create_index([("patient_id", 1), ("prescription_id", 1)], name="prescription_vector_patient")
     await db.handbook_chunks.create_index(
         [("document", 1), ("version", 1), ("chunk_index", 1)],
@@ -81,4 +103,4 @@ async def ensure_indexes() -> None:
         name="uniq_handbook_doc_version_chunk",
     )
 
-    logger.info("MongoDB indexes ensured (multi-tenant appointment index active)")
+    logger.info("MongoDB indexes ensured successfully.")

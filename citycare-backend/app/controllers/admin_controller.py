@@ -6,6 +6,7 @@ from bson import ObjectId
 from fastapi import HTTPException, status
 from pymongo.errors import DuplicateKeyError
 
+from app.core.config import VALID_SLOTS
 from app.core.security import hash_password
 from app.cruds import hospital_crud, user_crud
 from app.models.hospital_model import hospital_document, serialize_hospital
@@ -29,11 +30,15 @@ async def create_hospital(payload: HospitalCreate, created_by: str) -> HospitalO
         state=payload.state,
         contact_phone=payload.contact_phone,
         contact_email=payload.contact_email,
-        status="active",
+        facilities=payload.facilities,
+        services=payload.services,
+        working_hours=payload.working_hours,
+        emergency_contact=payload.emergency_contact,
+        status=payload.status or "active",
         created_by=created_by,
     )
     created = await hospital_crud.create_hospital(doc)
-    logger.info("Hospital created: %s (by %s)", payload.name, created_by)
+    logger.info("Hospital created: %s (status=%s by %s)", payload.name, doc["status"], created_by)
     return HospitalOut(**serialize_hospital(created))
 
 
@@ -61,7 +66,6 @@ async def update_hospital(hospital_id: str, payload: HospitalUpdate) -> Hospital
 
 async def create_manager(payload: CreateManagerRequest, created_by: str) -> UserOut:
     """Super admin creates a hospital manager and assigns them to a hospital."""
-    # Validate hospital exists
     hospital = await hospital_crud.get_hospital_by_id(payload.hospital_id)
     if not hospital:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Hospital not found.")
@@ -81,6 +85,7 @@ async def create_manager(payload: CreateManagerRequest, created_by: str) -> User
         password_hash=hash_password(payload.password),
         role=UserRole.HOSPITAL_MANAGER,
         hospital_id=payload.hospital_id,
+        is_active=True,
     )
     try:
         created = await user_crud.create_user(doc)
@@ -115,10 +120,13 @@ async def create_doctor(payload: CreateDoctorRequest, created_by: str) -> UserOu
         password_hash=hash_password(payload.password),
         role=UserRole.DOCTOR,
         hospital_id=payload.hospital_id,
+        is_active=True,
+        qualification=payload.qualification or "MBBS",
+        specialization=payload.specialization or "General Physician",
+        available_days=payload.available_days or ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"],
+        working_hours=payload.working_hours or "10:00 - 20:00",
+        valid_slots=payload.valid_slots or list(VALID_SLOTS),
     )
-    # Store optional doctor-specific fields
-    doc["qualification"] = payload.qualification or "MBBS"
-    doc["specialization"] = payload.specialization or "General Physician"
 
     try:
         created = await user_crud.create_user(doc)

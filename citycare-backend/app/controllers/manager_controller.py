@@ -6,7 +6,7 @@ from fastapi import HTTPException, status
 
 from app.cruds import hospital_crud
 from app.models.hospital_model import serialize_hospital
-from app.schemas.hospital_schema import HospitalOut, HospitalUpdate
+from app.schemas.hospital_schema import HospitalManagerUpdate, HospitalOut
 from app.utils.logger import get_logger
 
 logger = get_logger(__name__)
@@ -25,14 +25,15 @@ async def get_my_hospital(manager: Dict[str, Any]) -> HospitalOut:
     return HospitalOut(**serialize_hospital(hospital))
 
 
-async def update_my_hospital(manager: Dict[str, Any], payload: HospitalUpdate) -> HospitalOut:
+async def update_my_hospital(manager: Dict[str, Any], payload: HospitalManagerUpdate) -> HospitalOut:
     hospital_id = manager.get("hospital_id")
     if not hospital_id:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="This account is not assigned to a hospital.",
         )
-    updates = {k: v for k, v in payload.model_dump().items() if v is not None}
+    # Exclude status from manager updates (only admins can change status)
+    updates = {k: v for k, v in payload.model_dump().items() if v is not None and k != "status"}
     if not updates:
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="No fields to update.")
 

@@ -29,7 +29,14 @@ async def create(payload: PrescriptionCreate, current_user: Dict[str, Any]) -> P
     patient = await user_crud.get_user_by_id(appointment["patient_id"])
     if not patient:
         raise HTTPException(status_code=404, detail="Appointment patient was not found.")
-    document = prescription_document(patient_id=appointment["patient_id"], doctor_id=str(current_user["_id"]), appointment_id=payload.appointment_id, diagnosis=payload.diagnosis, medicines=[m.model_dump() for m in payload.medicines], general_instructions=payload.general_instructions)
+    document = prescription_document(
+        patient_id=appointment["patient_id"],
+        doctor_id=str(current_user["_id"]),
+        appointment_id=payload.appointment_id,
+        diagnosis=payload.diagnosis,
+        medicines=[m.model_dump() for m in payload.medicines],
+        general_instructions=payload.general_instructions,
+    )
     try:
         # Generate/upload before persisting so a successful record always has a usable PDF URL.
         pdf = generate_prescription_pdf(document, appointment, current_user, patient)
@@ -55,12 +62,23 @@ async def get_one(prescription_id: str, current_user: Dict[str, Any]) -> Prescri
     if not doc:
         raise HTTPException(status_code=404, detail="Prescription not found.")
     user_id, role = str(current_user["_id"]), current_user.get("role")
-    if role in ("customer", "patient") and doc["patient_id"] != user_id:
+
+    if role in ("customer", "patient"):
+        if doc["patient_id"] != user_id:
+            raise HTTPException(status_code=403, detail="You do not have access to this prescription.")
+    elif role == "doctor":
+        if doc["doctor_id"] != user_id:
+            raise HTTPException(status_code=403, detail="You do not have access to this prescription.")
+    elif role == "hospital_manager":
+        # Resolve appointment to verify hospital scope
+        appointment = await appointment_crud.get_appointment_by_id(doc["appointment_id"])
+        if not appointment or appointment.get("hospital_id") != current_user.get("hospital_id"):
+            raise HTTPException(status_code=403, detail="You do not have access to prescriptions from another hospital.")
+    elif role == "super_admin":
+        pass  # Super admin is authorized for all platform prescriptions
+    else:
         raise HTTPException(status_code=403, detail="You do not have access to this prescription.")
-    if role == "doctor" and doc["doctor_id"] != user_id:
-        raise HTTPException(status_code=403, detail="You do not have access to this prescription.")
-    if role not in ("customer", "patient", "doctor", "hospital_manager", "super_admin"):
-        raise HTTPException(status_code=403, detail="You do not have access to this prescription.")
+
     doctor = await user_crud.get_user_by_id(doc["doctor_id"])
     return PrescriptionOut(**serialize_prescription(doc, doctor_name=_doctor_name(doctor or {})))
 

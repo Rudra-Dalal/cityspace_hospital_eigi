@@ -1,26 +1,23 @@
-# CityCare Clinic
+# CityCare Multi-Hospital Platform
 
-End-to-end appointment booking for a single-doctor clinic (Dr. Meera Kulkarni, CityCare Clinic, Dharampeth, Nagpur).
+Comprehensive multi-hospital healthcare management, patient appointment scheduling, prescription tracking, and AI-assisted care platform.
 
-## Repositories in this workspace
+## Architecture
 
-| Folder | Stack |
-|--------|--------|
-| `citycare-backend/` | FastAPI · MongoDB (Motor) · JWT · pytest |
-| `citycare-frontend/` | Vite · React (JS) · Tailwind · react-router-dom |
+| Folder | Stack | Description |
+|--------|-------|-------------|
+| `citycare-backend/` | FastAPI · Motor (Async MongoDB) · JWT · Pytest | REST API, multi-tenant controllers, auth, doctor availability, RAG & VoiceBot |
+| `citycare-frontend/` | Vite · React · TypeScript · TanStack Router & Query | Modern patient booking UI, role portals (Patient, Doctor, Manager, Admin) |
 
-## Quick start
+## Quick Start
 
 ### 1. MongoDB
-
 ```bash
 docker run -d --name citycare-mongo -p 27017:27017 mongo:7
 ```
-
 Or start your local MongoDB service (`net start MongoDB` on Windows).
 
 ### 2. Backend
-
 ```bash
 cd citycare-backend
 python -m venv venv
@@ -31,7 +28,6 @@ uvicorn app.main:app --reload --port 8000
 ```
 
 ### 3. Frontend
-
 ```bash
 cd citycare-frontend
 copy .env.example .env
@@ -39,34 +35,39 @@ npm install
 npm run dev
 ```
 
-- Frontend: http://localhost:5173  
-- API docs: http://localhost:8000/docs  
+- Frontend: http://localhost:5173
+- Backend Swagger Docs: http://localhost:8000/docs
+- Health Check: http://localhost:8000/health
 
-### Seeded doctor
+---
 
-Defaults from `.env.example`:
+## Core Domain Capabilities
 
-- Email: `doctor@citycare.clinic`
-- Password: `Doctor@123`
+1. **Explicit Multi-Hospital & Doctor Selection**: Patients explicitly choose an active hospital branch, specialist doctor, date, and doctor-specific available slot without arbitrary fallbacks.
+2. **Doctor-Specific Availability Model**: Computes real-time availability based on doctor assigned weekdays, configured time slots, and booked appointment subtraction.
+3. **Reusable Registration Service**: Standardized patient registration with E.164 phone formatting (+91), password security, duplicate prevention, and strict customer role enforcement.
+4. **Multi-Role Scoped Authorization**:
+   - **Super Admin**: Manages hospitals (including activation status) and staff assignments.
+   - **Hospital Manager**: Updates branch operational info (address, hours, facilities, contact); cannot modify status; accesses appointments and prescriptions strictly scoped to their hospital.
+   - **Doctor**: Manages schedules, accepts appointments, generates prescriptions with PDF storage.
+   - **Customer**: Manages own bookings and prescriptions with zero cross-tenant leakage.
+   - **Deactivated Accounts**: Blocked with 401 Unauthorized across login and protected endpoints.
+5. **No Double-Booking Guarantee**: Multi-tenant partial unique index `(hospital_id, doctor_id, date, slot)` for `status="booked"`.
 
-## Tests
+---
+
+## Automated Verification
+
+Run all unit and integration tests in `citycare-backend`:
 
 ```bash
 cd citycare-backend
-.\venv\Scripts\Activate.ps1
-pytest -v
+.\venv\Scripts\pytest -v
 ```
 
-## Prescriptions and patient assistant
+Build the frontend client:
 
-Doctors accept booked appointments before creating one prescription per accepted appointment. The backend generates a real PDF, then uploads it to Cloudinary. Configure `CLOUDINARY_CLOUD_NAME`, `CLOUDINARY_API_KEY`, and `CLOUDINARY_API_SECRET` in `citycare-backend/.env`.
-
-Patients retrieve only their own prescriptions at `GET /prescriptions/my`. The patient assistant at `POST /patient-ai/chat` retrieves records filtered by the JWT-authenticated patient ID before Gemini receives any context. It provides prescription information only and never changes medication instructions.
-
-See each folder’s README for endpoint tables, architecture notes, and viva prep.
-
-For the backend command-line interface, see the [CityCare CLI Guide](CLI_GUIDE.md).
-
-## Telephony VoiceBot
-
-The backend includes a real-time Telephony VoiceBot layer (`POST /voice/incoming` and `WS /voice/ws`) powered by Twilio Media Streams, Pipecat, Deepgram STT, Gemini AI, and Sarvam TTS. Phone calls retrieve grounded answers to general clinic questions from the Handbook RAG. See `citycare-backend/README.md` for full ngrok setup and Twilio configuration.
+```bash
+cd citycare-frontend
+npm run build
+```

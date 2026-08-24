@@ -8,7 +8,7 @@ from fastapi import HTTPException, status
 from pymongo.errors import DuplicateKeyError
 
 from app.core.config import VALID_SLOTS, get_settings
-from app.cruds import appointment_crud
+from app.cruds import appointment_crud, hospital_crud, user_crud
 from app.models.appointment_model import (
     AppointmentStatus,
     appointment_document,
@@ -18,6 +18,8 @@ from app.schemas.appointment_schema import AcceptResponse, AppointmentCreate, Ap
 from app.utils.logger import get_logger
 
 logger = get_logger(__name__)
+
+DEFAULT_AVAILABLE_DAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"]
 
 
 def validate_booking_date(date_str: str) -> date_cls:
@@ -49,12 +51,19 @@ def validate_booking_date(date_str: str) -> date_cls:
 
 async def get_free_slots(date_str: str, doctor_id: Optional[str] = None, hospital_id: Optional[str] = None) -> Dict[str, Any]:
     validate_booking_date(date_str)
+    
+    valid_slots = list(VALID_SLOTS)
+    if doctor_id:
+        doctor = await user_crud.get_user_by_id(doctor_id)
+        if doctor and doctor.get("valid_slots"):
+            valid_slots = doctor["valid_slots"]
+
     booked = set(await appointment_crud.get_booked_slots_for_date(
         date_str,
         doctor_id=doctor_id,
         hospital_id=hospital_id,
     ))
-    free = [s for s in VALID_SLOTS if s not in booked]
+    free = [s for s in valid_slots if s not in booked]
     return {"date": date_str, "free_slots": free}
 
 
@@ -63,8 +72,8 @@ async def book_appointment(
     current_user: Dict[str, Any],
 ) -> AppointmentOut:
     """
-    Gates 2–4 (Gate 1 already handled by auth dependency).
-    Identity comes only from the JWT — never from the request body.
+    Harden appointment booking with full multi-tenant and clinical checks.
+    Identity comes ONLY from the JWT — never from the request body.
     """
     # Accept both "customer" and legacy "patient"
     if current_user.get("role") not in ("customer", "patient"):
@@ -73,23 +82,45 @@ async def book_appointment(
             detail="Only customers can book appointments.",
         )
 
-    validate_booking_date(payload.date)
-
-    if payload.slot not in VALID_SLOTS:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Invalid slot. Choose one of: {', '.join(VALID_SLOTS)}",
-        )
-
-    # Resolve hospital and doctor for this booking
-    from app.cruds import hospital_crud
-    from app.core.database import get_database
+    target_date = validate_booking_date(payload.date)
+    day_of_week = target_date.strftime("%A")
 
     hospital_id: Optional[str] = payload.hospital_id
     doctor_id: Optional[str] = payload.doctor_id
 
-    # Fall back to the first active hospital/doctor if not provided (backward-compat)
-    if not hospital_id:
+    # 1. Resolve and validate hospital & doctor
+    if hospital_id and doctor_id:
+        hospital = await hospital_crud.get_hospital_by_id(hospital_id)
+        if not hospital or hospital.get("status") != "active":
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Selected hospital is invalid or inactive.",
+            )
+
+        doctor = await user_crud.get_user_by_id(doctor_id)
+        if not doctor or doctor.get("role") != "doctor" or doctor.get("is_active") is False:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Selected doctor is invalid or inactive.",
+            )
+
+        if doctor.get("hospital_id") != hospital_id:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Selected doctor does not belong to the selected hospital.",
+            )
+    elif hospital_id and not doctor_id:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Both hospital_id and doctor_id must be provided.",
+        )
+    elif doctor_id and not hospital_id:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Both hospital_id and doctor_id must be provided.",
+        )
+    else:
+        # Isolated backward-compatibility fallback for older single-clinic tests
         hospitals = await hospital_crud.get_all_hospitals(status="active")
         if not hospitals:
             raise HTTPException(
@@ -97,24 +128,42 @@ async def book_appointment(
                 detail="No active hospital found.",
             )
         hospital_id = str(hospitals[0]["_id"])
-
-    if not doctor_id:
+        
+        from app.core.database import get_database
         db = get_database()
-        doctor = await db.users.find_one({"hospital_id": hospital_id, "role": "doctor"})
+        doctor = await db.users.find_one({"hospital_id": hospital_id, "role": "doctor", "is_active": {"$ne": False}})
         if not doctor:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                detail="No doctor found for this hospital.",
+                detail="No active doctor found for this hospital.",
             )
         doctor_id = str(doctor["_id"])
 
-    # Polite pre-check (helpful early answer)
+    # 2. Check doctor availability schedule for the day of the week
+    available_days = doctor.get("available_days") or DEFAULT_AVAILABLE_DAYS
+    if day_of_week not in available_days:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Doctor is not available on {day_of_week}s.",
+        )
+
+    # 3. Check doctor slot validity
+    doctor_valid_slots = doctor.get("valid_slots") or list(VALID_SLOTS)
+    if payload.slot not in doctor_valid_slots:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Invalid slot for this doctor. Choose from: {', '.join(doctor_valid_slots)}",
+        )
+
+    # 4. Polite pre-check for slot conflict
     if await appointment_crud.slot_is_booked(payload.date, payload.slot, doctor_id=doctor_id, hospital_id=hospital_id):
         logger.info(
-            "Booking conflict (pre-check): date=%s slot=%s user=%s",
+            "Booking conflict (pre-check): date=%s slot=%s user=%s doctor=%s hospital=%s",
             payload.date,
             payload.slot,
             current_user.get("email"),
+            doctor_id,
+            hospital_id,
         )
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
@@ -137,10 +186,11 @@ async def book_appointment(
     except DuplicateKeyError:
         # Steel door — race-condition guard via partial unique index
         logger.warning(
-            "Booking conflict (duplicate key): date=%s slot=%s user=%s",
+            "Booking conflict (duplicate key): date=%s slot=%s user=%s doctor=%s",
             payload.date,
             payload.slot,
             current_user.get("email"),
+            doctor_id,
         )
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,

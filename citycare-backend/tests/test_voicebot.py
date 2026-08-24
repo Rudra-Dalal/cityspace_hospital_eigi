@@ -37,7 +37,14 @@ async def test_incoming_voice_webhook_returns_twiml(client: AsyncClient, monkeyp
 @pytest.mark.asyncio
 async def test_voice_chat_service_answers_general_handbook_question(client: AsyncClient):
     """Verify run_voice_chat retrieves grounded answers from Handbook RAG for callers."""
-    reply = await run_voice_chat("What are the consultation hours?", call_sid="test_call_1")
+    from unittest.mock import MagicMock, patch
+    mock_genai_client = MagicMock()
+    mock_response = MagicMock()
+    mock_response.text = "Clinic consultation hours are 9 AM to 8 PM Monday to Saturday."
+    mock_genai_client.models.generate_content.return_value = mock_response
+
+    with patch("google.genai.Client", return_value=mock_genai_client):
+        reply = await run_voice_chat("What are the consultation hours?", call_sid="test_call_1")
     assert isinstance(reply, str)
     assert len(reply) > 10
     # Spoken responses must not contain markdown formatting

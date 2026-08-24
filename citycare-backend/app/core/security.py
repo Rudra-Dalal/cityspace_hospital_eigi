@@ -84,6 +84,14 @@ async def get_current_user(
             headers={"WWW-Authenticate": "Bearer"},
         )
 
+    if user.get("is_active") is False:
+        logger.warning("Authentication failed: user %s is deactivated", user_id)
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Account is deactivated. Please contact support.",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
     user["id"] = str(user["_id"])
     return user
 
