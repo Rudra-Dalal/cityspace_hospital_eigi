@@ -83,3 +83,24 @@ class TelegramIdempotency(BaseModel):
     processed_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     expires_at: datetime
     error: Optional[str] = None
+
+
+class TelegramUpdateStatus(str, Enum):
+    PENDING = "pending"
+    PROCESSING = "processing"
+    COMPLETED = "completed"
+    FAILED = "failed"
+
+
+class TelegramUpdateDoc(BaseModel):
+    update_id: int
+    payload: Dict[str, Any]
+    status: str = TelegramUpdateStatus.PENDING.value
+    attempts: int = 0
+    max_attempts: int = 3
+    locked_until: Optional[datetime] = None
+    last_error: Optional[str] = None
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    processed_at: Optional[datetime] = None
+    expires_at: datetime
+

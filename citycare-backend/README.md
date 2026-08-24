@@ -255,7 +255,7 @@ python run_telegram_poller.py
 ```
 
 **Production (Webhook Mode):**
-Configure in `.env`:
+1. Configure in `.env`:
 ```env
 TELEGRAM_ENABLED=true
 TELEGRAM_BOT_TOKEN=<your_token>
@@ -263,6 +263,16 @@ TELEGRAM_MODE=webhook
 TELEGRAM_WEBHOOK_URL=https://api.citycare.clinic/telegram/webhook
 TELEGRAM_WEBHOOK_SECRET=<your_secret_token>
 TELEGRAM_TIMEZONE=Asia/Kolkata
+```
+
+2. Register webhook with Telegram Bot API:
+```bash
+python -m telegram_gateway.register_webhook
+```
+
+3. (Optional) Run standalone durable background queue worker:
+```bash
+python -m telegram_gateway.worker
 ```
 
 ---
@@ -276,11 +286,11 @@ Run the complete backend test suite:
 ```
 
 ### Current Test Suite Status
-- **Total Tests Executed**: **119**
-- **Passed**: **119 (100%)**
+- **Total Tests Executed**: **122**
+- **Passed**: **122 (100%)**
 - **Failed**: **0**
 - **Test Modules**:
-  - `tests/test_telegram_gateway.py`: 16 passed
+  - `tests/test_telegram_gateway.py`: 19 passed
   - `tests/test_patient_domain.py`: 12 passed
   - `tests/test_cli.py`: 40 passed
   - `tests/test_ai_chat.py`: 17 passed
@@ -291,4 +301,5 @@ Run the complete backend test suite:
   - `tests/test_doctor.py`: 4 passed
   - `tests/test_prescription_rag.py`: 3 passed
   - `tests/test_prescriptions.py`: 2 passed
+
 

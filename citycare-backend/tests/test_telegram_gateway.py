@@ -760,6 +760,125 @@ async def test_protected_prescription_pdf_delivery():
         callback_query_id="cb_auth",
     )
     assert len(fake_adapter.sent_documents) == 1
-    assert fake_adapter.sent_documents[0]["document"] == rx["pdf_url"]
+    sent_doc = fake_adapter.sent_documents[0]
+    assert isinstance(sent_doc["document"], bytes)
+    assert sent_doc["document"].startswith(b"%PDF")
+    assert sent_doc["filename"] == f"CityCare_Prescription_{rx_id[:8]}.pdf"
+
+
+@pytest.mark.asyncio
+async def test_durable_update_queue_lifecycle_and_lease_expiry():
+    """Verify durable persistence, atomic claim with lease, crash recovery, and deduplication."""
+    from telegram_gateway.worker import (
+        enqueue_update,
+        claim_next_update,
+        mark_update_completed,
+        mark_update_failed,
+    )
+    from telegram_gateway.models import TelegramUpdateStatus
+    from datetime import timedelta
+
+    db = get_database()
+    await db.telegram_updates.delete_many({})
+
+    update_id = 999888111
+    payload = {"update_id": update_id, "message": {"text": "/start", "chat": {"id": 12345}}}
+
+    # 1. Enqueue update
+    ok, reason = await enqueue_update(payload, max_attempts=3)
+    assert ok is True
+    assert reason == "enqueued"
+
+    # 2. Duplicate enqueue returns True with duplicate_ignored
+    ok_dup, reason_dup = await enqueue_update(payload, max_attempts=3)
+    assert ok_dup is True
+    assert reason_dup == "duplicate_ignored"
+
+    # 3. Worker claims update atomically with lease
+    claimed = await claim_next_update(lease_seconds=30)
+    assert claimed is not None
+    assert claimed["update_id"] == update_id
+    assert claimed["status"] == TelegramUpdateStatus.PROCESSING.value
+    assert claimed["attempts"] == 1
+    assert claimed["locked_until"] is not None
+
+    # 4. Another concurrent worker gets None (already locked)
+    claimed_again = await claim_next_update()
+    assert claimed_again is None
+
+    # 5. Simulate crashed worker: expire the lease
+    past_time = datetime.now(timezone.utc) - timedelta(seconds=10)
+    await db.telegram_updates.update_one(
+        {"update_id": update_id},
+        {"$set": {"locked_until": past_time}},
+    )
+
+    # 6. Recovery worker re-claims expired lease
+    recovered = await claim_next_update(lease_seconds=30)
+    assert recovered is not None
+    assert recovered["update_id"] == update_id
+    assert recovered["attempts"] == 2
+
+    # 7. Mark completed
+    await mark_update_completed(update_id)
+
+    # 8. Completed update is not re-claimed
+    claimed_after_done = await claim_next_update()
+    assert claimed_after_done is None
+
+
+@pytest.mark.asyncio
+async def test_durable_update_bounded_retries():
+    """Verify failed updates are retried up to max_attempts and then dropped from queue."""
+    from telegram_gateway.worker import enqueue_update, claim_next_update, mark_update_failed
+
+    db = get_database()
+    await db.telegram_updates.delete_many({})
+
+    update_id = 888777222
+    payload = {"update_id": update_id, "message": {"text": "broken_update"}}
+
+    await enqueue_update(payload, max_attempts=2)
+
+    # Attempt 1
+    c1 = await claim_next_update()
+    assert c1 is not None
+    assert c1["attempts"] == 1
+    await mark_update_failed(update_id, "Failure 1")
+
+    # Attempt 2
+    c2 = await claim_next_update()
+    assert c2 is not None
+    assert c2["attempts"] == 2
+    await mark_update_failed(update_id, "Failure 2")
+
+    # Attempt 3 -> Bounded! (attempts == max_attempts == 2)
+    c3 = await claim_next_update()
+    assert c3 is None
+
+
+
+@pytest.mark.asyncio
+async def test_register_webhook_helper():
+    """Verify register_webhook reads settings and calls set_webhook."""
+    from telegram_gateway.register_webhook import register_webhook
+
+    fake_adapter = FakeTelegramAdapter()
+    settings = get_settings()
+    settings.telegram_enabled = True
+    settings.telegram_bot_token = "123456:ABC-DEF"
+    settings.telegram_webhook_url = "https://api.citycare.clinic/telegram/webhook"
+    settings.telegram_webhook_secret = "my-secret-token-32-chars-long"
+
+    res = await register_webhook(adapter=fake_adapter)
+    assert res.get("ok") is True
+
+    # Reset
+    settings.telegram_enabled = False
+    settings.telegram_bot_token = ""
+    settings.telegram_webhook_url = ""
+    settings.telegram_webhook_secret = ""
+
+
 
 

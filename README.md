@@ -189,9 +189,9 @@ A dedicated, isolated conversational gateway (`telegram_gateway/`) for patients 
 ## Verification & Build Results
 
 ### Backend Automated Test Suite (`pytest -v`)
-- **Total Tests**: **119 passed, 0 failed** (100% pass rate)
+- **Total Tests**: **122 passed, 0 failed** (100% pass rate)
 - **Coverage**:
-  - `tests/test_telegram_gateway.py`: 16 tests (Disabled startup, production validation, markdown escaping, OTP & identity mapping, consent & activation tokens, persistent sessions, distributed rate limiting, update idempotency, discovery flows, booking state machine, AI emergency escalation, webhook security, real OTP providers, password activation lifecycle, idempotency crash/retry, protected prescription PDF delivery)
+  - `tests/test_telegram_gateway.py`: 19 tests (Disabled startup, production validation, markdown escaping, OTP & identity mapping, consent & activation tokens, persistent sessions, distributed rate limiting, update idempotency, discovery flows, booking state machine, AI emergency escalation, webhook security, real OTP providers, password activation lifecycle, idempotency crash/retry, protected prescription PDF binary delivery, durable queue lifecycle & lease expiry, bounded retry limits, webhook registration helper)
   - `tests/test_patient_domain.py`: 12 tests (Multi-tenant discovery, weekday availability, inactive status rejection, manager authorization, migration idempotency)
   - `tests/test_cli.py`: 40 tests (CLI subcommands, token resolution, security enforcement, deactivated user blocking)
   - `tests/test_ai_chat.py`: 17 tests (Doctor clinical chat, conversation continuity, rate limits)

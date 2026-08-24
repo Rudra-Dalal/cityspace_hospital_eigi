@@ -135,5 +135,11 @@ async def ensure_indexes() -> None:
     await db.telegram_rate_limits.create_index("key", unique=True, name="uniq_telegram_rate_limit_key")
     await db.telegram_rate_limits.create_index("expires_at", expireAfterSeconds=0, name="ttl_telegram_rate_limits")
 
+    # 11. Durable Telegram Incoming Updates
+    await db.telegram_updates.create_index("update_id", unique=True, name="uniq_telegram_updates_id")
+    await db.telegram_updates.create_index([("status", 1), ("locked_until", 1), ("attempts", 1)], name="idx_telegram_updates_queue")
+    await db.telegram_updates.create_index("expires_at", expireAfterSeconds=0, name="ttl_telegram_updates")
+
     logger.info("MongoDB indexes ensured successfully.")
+
 
