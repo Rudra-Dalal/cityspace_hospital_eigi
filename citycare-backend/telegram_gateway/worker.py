@@ -169,8 +169,7 @@ async def process_one_claimed_update(router: TelegramRouter, update_doc: Dict[st
 async def process_pending_batch(router: Optional[TelegramRouter] = None, max_batch_size: int = 10) -> int:
     """Process a batch of pending/retryable updates."""
     if router is None:
-        from telegram_gateway.router import get_telegram_router
-        router = get_telegram_router()
+        router = TelegramRouter()
 
     processed_count = 0
     for _ in range(max_batch_size):
@@ -190,10 +189,10 @@ async def run_worker_loop(
 ) -> None:
     """Dedicated background worker loop for processing durable updates."""
     if router is None:
-        from telegram_gateway.router import get_telegram_router
-        router = get_telegram_router()
+        router = TelegramRouter()
 
     logger.info("Starting Telegram durable update worker loop (interval=%ss)", poll_interval_seconds)
+
 
     while stop_event is None or not stop_event.is_set():
         try:
