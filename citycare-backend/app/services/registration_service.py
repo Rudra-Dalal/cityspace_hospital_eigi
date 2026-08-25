@@ -115,20 +115,28 @@ async def register_patient(
             detail="A valid email address is required.",
         )
 
-    if not re.fullmatch(r"\+91[6-9]\d{9}", mobile):
+    # Normalize mobile
+    clean_mobile = re.sub(r"[\s\-\.\(\)]", "", mobile)
+    if clean_mobile.startswith("0") and len(clean_mobile) == 11:
+        clean_mobile = clean_mobile[1:]
+    if re.fullmatch(r"[6-9]\d{9}", clean_mobile):
+        clean_mobile = f"+91{clean_mobile}"
+
+    if not re.fullmatch(r"\+91[6-9]\d{9}", clean_mobile):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Mobile must match +91 followed by a 10-digit Indian number.",
         )
+    mobile = clean_mobile
 
     if not password and allow_activation_token:
         # Generate random temporary password hash for token-based activation
         pwd_hash = hash_password(secrets.token_urlsafe(24))
     else:
-        if len(password) < 8:
+        if len(password) < 6:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Password must be at least 8 characters long.",
+                detail="Password must be at least 6 characters long.",
             )
         pwd_hash = hash_password(password)
 

@@ -9,12 +9,25 @@ from pydantic import BaseModel, EmailStr, Field, field_validator
 from app.models.user_model import UserRole
 
 
+def normalize_indian_mobile(v: str) -> str:
+    if not isinstance(v, str):
+        raise ValueError("mobile must be a string")
+    clean = re.sub(r"[\s\-\.\(\)]", "", v.strip())
+    if clean.startswith("0") and len(clean) == 11:
+        clean = clean[1:]
+    if re.fullmatch(r"[6-9]\d{9}", clean):
+        clean = f"+91{clean}"
+    if not re.fullmatch(r"\+91[6-9]\d{9}", clean):
+        raise ValueError("mobile must be a valid 10-digit Indian number (e.g. +91 98765 43210 or 9876543210)")
+    return clean
+
+
 class SignupRequest(BaseModel):
     first_name: str = Field(..., min_length=1, max_length=50)
     last_name: str = Field(..., min_length=1, max_length=50)
     email: EmailStr
     mobile: str = Field(..., description="Indian mobile with +91")
-    password: str = Field(..., min_length=8, max_length=128)
+    password: str = Field(..., min_length=6, max_length=128)
     # Even if a client sends role, signup ignores it and always creates a customer
     role: Optional[UserRole] = None
 
@@ -29,11 +42,7 @@ class SignupRequest(BaseModel):
     @field_validator("mobile")
     @classmethod
     def validate_indian_mobile(cls, v: str) -> str:
-        v = v.strip()
-        # Accept +91 followed by 10 digits starting 6–9
-        if not re.fullmatch(r"\+91[6-9]\d{9}", v):
-            raise ValueError("mobile must match +91 followed by a 10-digit Indian number")
-        return v
+        return normalize_indian_mobile(v)
 
 
 class LoginRequest(BaseModel):
@@ -43,7 +52,7 @@ class LoginRequest(BaseModel):
 
 class SetPasswordRequest(BaseModel):
     token: str = Field(..., min_length=16, description="One-time activation / password setup token")
-    new_password: str = Field(..., min_length=8, max_length=128)
+    new_password: str = Field(..., min_length=6, max_length=128)
 
 
 
@@ -110,7 +119,7 @@ class CreateManagerRequest(BaseModel):
     last_name: str = Field(..., min_length=1, max_length=50)
     email: EmailStr
     mobile: str = Field(..., description="Indian mobile with +91")
-    password: str = Field(..., min_length=8, max_length=128)
+    password: str = Field(..., min_length=6, max_length=128)
     hospital_id: str = Field(..., description="ObjectId of the hospital to assign")
 
     @field_validator("first_name", "last_name")
@@ -121,10 +130,7 @@ class CreateManagerRequest(BaseModel):
     @field_validator("mobile")
     @classmethod
     def validate_mobile(cls, v: str) -> str:
-        v = v.strip()
-        if not re.fullmatch(r"\+91[6-9]\d{9}", v):
-            raise ValueError("mobile must match +91 followed by a 10-digit Indian number")
-        return v
+        return normalize_indian_mobile(v)
 
 
 class CreateDoctorRequest(BaseModel):
@@ -133,7 +139,7 @@ class CreateDoctorRequest(BaseModel):
     last_name: str = Field(..., min_length=1, max_length=50)
     email: EmailStr
     mobile: str = Field(..., description="Indian mobile with +91")
-    password: str = Field(..., min_length=8, max_length=128)
+    password: str = Field(..., min_length=6, max_length=128)
     hospital_id: str = Field(..., description="ObjectId of the hospital to assign")
     qualification: Optional[str] = "MBBS"
     specialization: Optional[str] = "General Physician"
@@ -149,10 +155,7 @@ class CreateDoctorRequest(BaseModel):
     @field_validator("mobile")
     @classmethod
     def validate_mobile(cls, v: str) -> str:
-        v = v.strip()
-        if not re.fullmatch(r"\+91[6-9]\d{9}", v):
-            raise ValueError("mobile must match +91 followed by a 10-digit Indian number")
-        return v
+        return normalize_indian_mobile(v)
 
     @field_validator("available_days")
     @classmethod

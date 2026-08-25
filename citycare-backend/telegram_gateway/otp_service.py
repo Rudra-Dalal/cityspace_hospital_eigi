@@ -39,7 +39,7 @@ class DevTestOtpDeliveryService(OtpDeliveryService):
             "otp_code": otp_code,
             "purpose": purpose,
         })
-        logger.debug("DevTest OTP delivered for %s (%s)", target_value, purpose)
+        logger.info("🔑 [DEV OTP] Verification Code for %s (%s): %s", target_value, purpose, otp_code)
         return True
 
     def get_latest_otp(self, target_value: Optional[str] = None) -> Optional[str]:

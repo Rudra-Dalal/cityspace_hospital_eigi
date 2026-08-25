@@ -630,11 +630,19 @@ function StaffDialog({
               setError("Select an assigned hospital branch");
               return;
             }
+
+            const rawMobile = form.mobile.replace(/[\s\-\.\(\)]/g, "");
+            const normalizedMobile = rawMobile.startsWith("+91")
+              ? rawMobile
+              : rawMobile.length === 10
+                ? `+91${rawMobile}`
+                : form.mobile.trim();
+
             mutation.mutate({
               first_name: form.first_name.trim(),
               last_name: form.last_name.trim(),
               email: form.email.trim(),
-              mobile: form.mobile.trim(),
+              mobile: normalizedMobile,
               password: form.password,
               hospital_id: Number.isNaN(Number(form.hospital_id))
                 ? form.hospital_id

@@ -56,8 +56,17 @@ function SignupPage() {
     if (form.first_name.trim().length < 2) next.first_name = "Enter your first name";
     if (form.last_name.trim().length < 2) next.last_name = "Enter your last name";
     if (!/^\S+@\S+\.\S+$/.test(form.email.trim())) next.email = "Enter a valid email address";
-    if (!/^[0-9+\-\s()]{7,15}$/.test(form.mobile.trim()))
-      next.mobile = "Enter a valid mobile number";
+
+    const rawMobile = form.mobile.replace(/[\s\-\.\(\)]/g, "");
+    const normalizedMobile = rawMobile.startsWith("+91")
+      ? rawMobile
+      : rawMobile.length === 10
+        ? `+91${rawMobile}`
+        : form.mobile.trim();
+
+    if (!/^\+91[6-9]\d{9}$/.test(normalizedMobile)) {
+      next.mobile = "Enter a valid 10-digit mobile number (e.g. +91 98765 43210 or 9876543210)";
+    }
     if (form.password.length < 6) next.password = "Password must be at least 6 characters";
     setErrors(next);
     setFormError("");
@@ -69,7 +78,7 @@ function SignupPage() {
         first_name: form.first_name.trim(),
         last_name: form.last_name.trim(),
         email: form.email.trim(),
-        mobile: form.mobile.trim(),
+        mobile: normalizedMobile,
         password: form.password,
       });
       setDone(true);
