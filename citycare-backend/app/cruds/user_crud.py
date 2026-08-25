@@ -20,6 +20,12 @@ async def get_user_by_email(email: str) -> Optional[Dict[str, Any]]:
     return await db.users.find_one({"email": email.lower().strip()})
 
 
+async def get_user_by_mobile(mobile: str) -> Optional[Dict[str, Any]]:
+    db = get_database()
+    clean = mobile.strip()
+    return await db.users.find_one({"mobile": clean})
+
+
 async def get_user_by_id(user_id: str) -> Optional[Dict[str, Any]]:
     db = get_database()
     try:

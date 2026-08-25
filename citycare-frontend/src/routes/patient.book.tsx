@@ -443,10 +443,10 @@ function BookAppointment() {
                       }
                     }}
                     className={cn(
-                      "group relative rounded-2xl p-5 text-left transition-all duration-200 border surface-panel tap-feedback",
+                      "group relative rounded-2xl p-5 text-left transition-all duration-200 border tap-feedback",
                       isSelected
-                        ? "border-primary bg-primary/5 ring-2 ring-primary shadow-soft"
-                        : "border-border bg-card hover:border-border/90 hover:bg-accent/30",
+                        ? "border-primary bg-card ring-2 ring-primary shadow-soft shadow-primary/10"
+                        : "border-border bg-card hover:border-primary/50 hover:bg-card hover:shadow-lg hover:shadow-primary/5 hover:-translate-y-0.5",
                     )}
                   >
                     <div className="flex items-start justify-between gap-2">
@@ -559,10 +559,10 @@ function BookAppointment() {
                         setErrors((prev) => ({ ...prev, doctor: undefined }));
                       }}
                       className={cn(
-                        "group relative rounded-2xl p-5 text-left transition-all duration-200 border surface-panel tap-feedback",
+                        "group relative rounded-2xl p-5 text-left transition-all duration-200 border tap-feedback",
                         isSelected
-                          ? "border-primary bg-primary/5 ring-2 ring-primary shadow-soft"
-                          : "border-border bg-card hover:border-border/90 hover:bg-accent/30",
+                          ? "border-primary bg-card ring-2 ring-primary shadow-soft shadow-primary/10"
+                          : "border-border bg-card hover:border-primary/50 hover:bg-card hover:shadow-lg hover:shadow-primary/5 hover:-translate-y-0.5",
                       )}
                     >
                       <div className="flex items-start justify-between gap-2">
@@ -635,7 +635,7 @@ function BookAppointment() {
                           "flex flex-col items-center justify-center rounded-xl p-2.5 text-center transition-all duration-150 border tap-feedback",
                           active
                             ? "border-primary bg-primary text-primary-foreground shadow-soft ring-1 ring-primary font-semibold"
-                            : "border-border bg-card text-foreground hover:bg-secondary/70 font-normal",
+                            : "border-border bg-card text-foreground hover:border-primary/40 hover:bg-card hover:shadow-subtle font-normal",
                         )}
                       >
                         <span className="block text-[10px] font-medium uppercase tracking-wider opacity-80">
@@ -698,7 +698,7 @@ function BookAppointment() {
                               "rounded-xl px-3 py-2.5 text-xs font-semibold transition-all duration-150 border tap-feedback",
                               active
                                 ? "border-primary bg-primary text-primary-foreground shadow-soft ring-2 ring-primary"
-                                : "border-border bg-card text-foreground hover:bg-secondary/70",
+                                : "border-border bg-card text-foreground hover:border-primary/40 hover:bg-card hover:shadow-subtle",
                             )}
                           >
                             <span className="flex items-center justify-center gap-1.5">
@@ -737,7 +737,7 @@ function BookAppointment() {
                               "rounded-full px-3 py-1 text-xs font-medium capitalize transition-all duration-150 border tap-feedback",
                               active
                                 ? "border-primary bg-primary text-primary-foreground shadow-subtle font-semibold"
-                                : "border-border bg-card text-muted-foreground hover:bg-secondary hover:text-foreground",
+                                : "border-border bg-card text-muted-foreground hover:border-primary/40 hover:bg-card hover:text-foreground",
                             )}
                           >
                             {symptom}

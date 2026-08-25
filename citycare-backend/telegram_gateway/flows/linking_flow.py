@@ -129,11 +129,20 @@ async def handle_linking_text_message(
         masked = target_val[:3] + "..." + target_val[-4:] if len(target_val) > 7 else target_val
         masked_esc = escape_markdown(masked)
 
+        dev_hint = ""
+        if settings.telegram_otp_provider.lower().strip() == "dev":
+            from telegram_gateway.otp_service import get_otp_delivery_service
+            dev_svc = get_otp_delivery_service()
+            if hasattr(dev_svc, "get_latest_otp"):
+                dev_code = dev_svc.get_latest_otp(target_val)
+                if dev_code:
+                    dev_hint = f"\n\n🔑 *Dev Code:* `{dev_code}`"
+
         await adapter.send_message(
             chat_id=chat_id,
             text=(
                 f"📩 *Verification Code Sent*\n\n"
-                f"We sent a 6\\-digit verification code to `{masked_esc}`\\.\n\n"
+                f"We sent a 6\\-digit verification code to `{masked_esc}`\\.{dev_hint}\n\n"
                 f"Please enter the code to verify and link your account:"
             ),
         )
