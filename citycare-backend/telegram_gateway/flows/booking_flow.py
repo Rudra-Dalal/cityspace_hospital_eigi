@@ -4,7 +4,7 @@ from datetime import date as date_cls, datetime, timezone, timedelta
 from typing import Any, Dict, List, Optional
 import zoneinfo
 
-from app.core.config import get_settings
+from app.cruds import user_crud
 from app.services.patient_discovery_service import (
     get_current_date_in_tz,
     validate_booking_date,
@@ -189,6 +189,20 @@ async def handle_booking_callback(
         flow_data["doctor_name"] = f"Dr. {doctor.get('first_name')} {doctor.get('last_name')}".strip()
         flow_data["doctor_spec"] = doctor.get("specialization")
 
+        # Auto-populate hospital details from doctor profile
+        if doctor.get("hospital_id"):
+            flow_data["hospital_id"] = str(doctor["hospital_id"])
+            if doctor.get("hospital_name"):
+                flow_data["hospital_name"] = doctor["hospital_name"]
+            if doctor.get("hospital_city"):
+                flow_data["hospital_city"] = doctor["hospital_city"]
+        elif not flow_data.get("hospital_id"):
+            all_hosps = await list_active_hospitals()
+            if all_hosps:
+                flow_data["hospital_id"] = str(all_hosps[0]["id"])
+                flow_data["hospital_name"] = all_hosps[0].get("name")
+                flow_data["hospital_city"] = all_hosps[0].get("city")
+
         # Generate upcoming 7 booking dates in hospital timezone
         today = get_current_date_in_tz(tz_name)
         dates_list = []
@@ -292,7 +306,26 @@ async def handle_booking_callback(
         slot_val = flow_data.get("slot")
         reason_val = flow_data.get("reason", "Consultation")
 
+        # Fallback: auto-resolve hospital if doctor is known
+        if doc_id and not hosp_id:
+            doctor = await get_doctor_details(doc_id)
+            if doctor and doctor.get("hospital_id"):
+                hosp_id = str(doctor["hospital_id"])
+                flow_data["hospital_id"] = hosp_id
+                if doctor.get("hospital_name"):
+                    flow_data["hospital_name"] = doctor["hospital_name"]
+            else:
+                all_hosps = await list_active_hospitals()
+                if all_hosps:
+                    hosp_id = str(all_hosps[0]["id"])
+                    flow_data["hospital_id"] = hosp_id
+                    flow_data["hospital_name"] = all_hosps[0].get("name")
+
+        if not patient and session.patient_id:
+            patient = await user_crud.get_user_by_id(session.patient_id)
+
         if not doc_id or not hosp_id or not date_val or not slot_val:
+            logger.warning("Incomplete booking details: %s", flow_data)
             await adapter.answer_callback_query(callback_query_id, text="Incomplete booking details. Please restart.", show_alert=True)
             return
 
@@ -378,6 +411,16 @@ async def handle_booking_text_message(
     flow_data = dict(session.flow_data or {})
     flow_data["reason"] = reason_clean
 
+    # Auto-resolve doctor and hospital names if missing
+    doc_id = flow_data.get("doctor_id")
+    if doc_id and not flow_data.get("hospital_name"):
+        doc = await get_doctor_details(doc_id)
+        if doc:
+            if doc.get("hospital_id") and not flow_data.get("hospital_id"):
+                flow_data["hospital_id"] = str(doc["hospital_id"])
+            if doc.get("hospital_name"):
+                flow_data["hospital_name"] = doc["hospital_name"]
+
     await SessionManager.update_flow(
         session_key=session.session_key,
         current_flow=TelegramFlowType.BOOKING.value,
@@ -386,8 +429,8 @@ async def handle_booking_text_message(
     )
 
     # Show confirmation summary card
-    h_name = escape_markdown(flow_data.get("hospital_name", "Selected Hospital"))
-    d_name = escape_markdown(flow_data.get("doctor_name", "Selected Doctor"))
+    h_name = escape_markdown(flow_data.get("hospital_name", "Central Clinic Branch"))
+    d_name = escape_markdown(flow_data.get("doctor_name", "Specialist Physician"))
     date_val = escape_markdown(flow_data.get("date", ""))
     slot_val = escape_markdown(flow_data.get("slot", ""))
     reason_esc = escape_markdown(reason_clean)
