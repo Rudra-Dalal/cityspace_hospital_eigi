@@ -43,12 +43,12 @@ export const Route = createFileRoute("/manager/dashboard")({
   ssr: false,
   head: () => ({
     meta: [
-      { title: "Hospital management — CityCare" },
+      { title: "Hospital Operations — Medihub / CityCare" },
       {
         name: "description",
-        content: "Manage your hospital profile, care team and appointment book inside CityCare.",
+        content: "Manage branch information, oversee medical care team, and track live patient booking volume.",
       },
-      { property: "og:title", content: "Hospital management — CityCare" },
+      { property: "og:title", content: "Hospital Operations — Medihub" },
       {
         property: "og:description",
         content: "Hospital profile, doctors and appointments in one place.",
@@ -118,7 +118,7 @@ function ManagerDashboard() {
   const todayCount = list.filter((a) => isToday(a.date)).length;
 
   return (
-    <div className="space-y-8 max-w-7xl mx-auto pb-12">
+    <div className="space-y-8 max-w-7xl mx-auto pb-16">
       <PageHeader
         eyebrow="Hospital Operations"
         title={hospital.data?.name ?? "Branch Dashboard"}
@@ -128,10 +128,10 @@ function ManagerDashboard() {
       {/* Stat Cards */}
       <div className="grid gap-4 sm:grid-cols-3">
         <StatCard
-          label="Care Team Doctors"
+          label="Care Team Physicians"
           value={doctors.data?.length ?? "—"}
           icon={<Stethoscope className="h-4 w-4" />}
-          hint="Assigned to this branch"
+          hint="Practicing at this branch"
         />
         <StatCard
           label="Appointments Today"
@@ -151,19 +151,19 @@ function ManagerDashboard() {
         <TabsList className="h-auto flex-wrap rounded-2xl bg-secondary/60 p-1.5 border border-border/60">
           <TabsTrigger
             value="profile"
-            className="rounded-xl px-5 py-2 text-xs font-bold tap-feedback"
+            className="rounded-xl px-5 py-2 text-xs font-semibold tap-feedback"
           >
             Branch Profile
           </TabsTrigger>
           <TabsTrigger
             value="doctors"
-            className="rounded-xl px-5 py-2 text-xs font-bold tap-feedback"
+            className="rounded-xl px-5 py-2 text-xs font-semibold tap-feedback"
           >
             Care Team ({doctors.data?.length ?? 0})
           </TabsTrigger>
           <TabsTrigger
             value="appointments"
-            className="rounded-xl px-5 py-2 text-xs font-bold tap-feedback"
+            className="rounded-xl px-5 py-2 text-xs font-semibold tap-feedback"
           >
             Appointment Register ({list.length})
           </TabsTrigger>
@@ -173,7 +173,7 @@ function ManagerDashboard() {
         <TabsContent value="profile" className="fade-rise">
           <Panel
             title="Branch Profile & Contact"
-            description="Information displayed to patients during appointment booking."
+            description="Official facility information displayed to patients during consultation booking."
           >
             {hospital.isLoading ? (
               <LoadingRows rows={3} />
@@ -240,7 +240,7 @@ function ManagerDashboard() {
                 <div className="sm:col-span-2 pt-2">
                   <Button
                     type="submit"
-                    className="rounded-xl font-bold shadow-soft tap-feedback px-6 h-11"
+                    className="rounded-xl font-semibold shadow-soft tap-feedback px-6 h-11"
                     disabled={save.isPending}
                   >
                     {save.isPending ? (

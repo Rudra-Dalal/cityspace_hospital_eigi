@@ -37,12 +37,12 @@ export const Route = createFileRoute("/doctor/dashboard")({
   ssr: false,
   head: () => ({
     meta: [
-      { title: "Doctor schedule — CityCare" },
+      { title: "Clinical Workspace — Medihub / CityCare" },
       {
         name: "description",
-        content: "Your CityCare consulting schedule, appointment volume and profile details.",
+        content: "Your consulting schedule, patient queue, digital prescriptions, and clinical AI assistant.",
       },
-      { property: "og:title", content: "Doctor schedule — CityCare" },
+      { property: "og:title", content: "Clinical Workspace — Medihub" },
       { property: "og:description", content: "Today's clinic at a glance, plus the week ahead." },
     ],
   }),
@@ -69,7 +69,7 @@ function DoctorDashboard() {
   const accept = useMutation({
     mutationFn: (id: string | number) => appointmentsApi.accept(id),
     onSuccess: () => {
-      toast.success("Appointment accepted");
+      toast.success("Appointment successfully accepted");
       queryClient.invalidateQueries({ queryKey: ["doctor", "schedule"] });
     },
     onError: (e) => toast.error(e instanceof Error ? e.message : "Could not accept appointment"),
@@ -81,7 +81,7 @@ function DoctorDashboard() {
   const profile = (info.data ?? {}) as Record<string, unknown>;
 
   return (
-    <div className="space-y-8 max-w-7xl mx-auto pb-12">
+    <div className="space-y-8 max-w-7xl mx-auto pb-16">
       <PageHeader
         eyebrow="Clinical Workspace"
         title={`Dr. ${personName(user, "Clinician")}`}
@@ -91,13 +91,13 @@ function DoctorDashboard() {
       {/* Metric Stat Cards */}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <StatCard
-          label="Today's Consultations"
+          label="Today's Clinic Queue"
           value={statsData ? ((statsData["today_visits"] as number) ?? today.length) : today.length}
           icon={<CalendarCheck className="h-4 w-4" />}
           hint="Scheduled for today"
         />
         <StatCard
-          label="Upcoming Visits"
+          label="Upcoming Consultations"
           value={
             statsData
               ? ((statsData["upcoming_visits"] as number) ?? upcoming.length)
@@ -114,13 +114,13 @@ function DoctorDashboard() {
               : appointments.length
           }
           icon={<Users className="h-4 w-4" />}
-          hint="All time recorded"
+          hint="All time records"
         />
         <StatCard
           label="Weekly Total"
           value={appointments.length}
           icon={<Clock className="h-4 w-4" />}
-          hint="Active appointment volume"
+          hint="Active patient volume"
         />
       </div>
 
@@ -190,15 +190,15 @@ function DoctorDashboard() {
         {/* Right Sidebar: Profile & AI Chat */}
         <div className="space-y-6">
           {/* Physician Profile Card */}
-          <Panel title="Physician Profile">
+          <Panel title="Physician Credentials">
             <div className="space-y-3 text-xs">
               <div className="flex items-center gap-3 border-b border-border/50 pb-3">
-                <span className="grid h-10 w-10 place-items-center rounded-2xl bg-primary/10 text-sm font-bold text-primary">
+                <span className="grid h-10 w-10 place-items-center rounded-2xl bg-primary/10 text-sm font-bold text-primary border border-primary/20">
                   {user?.first_name?.[0]}
                   {user?.last_name?.[0]}
                 </span>
                 <div>
-                  <p className="font-bold text-sm text-foreground">
+                  <p className="font-display font-bold text-sm text-foreground">
                     Dr. {user?.first_name} {user?.last_name}
                   </p>
                   <p className="text-primary font-semibold">
@@ -212,7 +212,7 @@ function DoctorDashboard() {
               {profile["qualification"] || user?.qualification ? (
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">Qualification:</span>
-                  <span className="font-medium text-foreground">
+                  <span className="font-semibold text-foreground">
                     {String(profile["qualification"] || user?.qualification)}
                   </span>
                 </div>
@@ -221,7 +221,7 @@ function DoctorDashboard() {
               {profile["working_hours"] || user?.working_hours ? (
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">Hours:</span>
-                  <span className="font-medium text-foreground">
+                  <span className="font-semibold text-foreground">
                     {String(profile["working_hours"] || user?.working_hours)}
                   </span>
                 </div>
@@ -229,7 +229,7 @@ function DoctorDashboard() {
 
               {user?.email ? (
                 <div className="flex items-center gap-2 text-muted-foreground pt-1">
-                  <Mail className="h-3.5 w-3.5" />
+                  <Mail className="h-3.5 w-3.5 text-primary" />
                   <span className="truncate">{user.email}</span>
                 </div>
               ) : null}
@@ -258,7 +258,6 @@ function DoctorAppointmentItem({
   isPrescribing?: boolean;
 }) {
   const isBooked = (appointment.status ?? "").toLowerCase() === "booked";
-  const isAccepted = (appointment.status ?? "").toLowerCase() === "accepted";
   const patient = appointment.customer || {};
   const patientName =
     appointment.patient_name ||
@@ -272,7 +271,7 @@ function DoctorAppointmentItem({
         <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3">
           <div className="min-w-0">
             <div className="flex items-center gap-2">
-              <span className="grid h-7 w-7 place-items-center rounded-full bg-secondary text-foreground text-xs font-bold">
+              <span className="grid h-7 w-7 place-items-center rounded-xl bg-secondary text-foreground text-xs font-bold border border-border/50">
                 <User className="h-4 w-4 text-primary" />
               </span>
               <h4 className="font-display font-bold text-base text-foreground leading-tight">
@@ -301,20 +300,20 @@ function DoctorAppointmentItem({
 
         {appointment.reason ? (
           <p className="mt-3 text-xs text-foreground/90 leading-relaxed bg-surface/70 rounded-xl p-3 border border-border/40">
-            <strong>Reason:</strong> {appointment.reason}
+            <strong className="text-foreground font-semibold">Reason:</strong> {appointment.reason}
           </p>
         ) : null}
 
         <div className="mt-3 flex flex-wrap items-center gap-1.5">
           {appointment.temperature ? (
-            <span className="inline-flex items-center gap-1 rounded-full bg-secondary px-2.5 py-0.5 text-[11px] font-medium text-muted-foreground">
+            <span className="inline-flex items-center gap-1 rounded-full bg-secondary px-2.5 py-0.5 text-[11px] font-medium text-muted-foreground border border-border/40">
               <Thermometer className="h-3 w-3 text-destructive" /> {appointment.temperature}°F
             </span>
           ) : null}
           {symptoms.map((symptom) => (
             <span
               key={symptom}
-              className="rounded-full bg-secondary/80 px-2.5 py-0.5 text-[11px] font-medium capitalize text-muted-foreground"
+              className="rounded-full bg-secondary/80 px-2.5 py-0.5 text-[11px] font-medium capitalize text-muted-foreground border border-border/40"
             >
               {symptom}
             </span>

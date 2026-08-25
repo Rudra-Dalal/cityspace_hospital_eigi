@@ -1,12 +1,14 @@
 import type { ReactNode } from "react";
 import {
   AlertCircle,
-  ArrowUpRight,
+  Calendar,
   CheckCircle2,
   Clock,
+  FileText,
   HelpCircle,
   RefreshCcw,
   Sparkles,
+  Stethoscope,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -24,19 +26,19 @@ export function PageHeader({
   action?: ReactNode;
 }) {
   return (
-    <header className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+    <header className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between fade-rise">
       <div className="min-w-0 max-w-3xl">
         {eyebrow ? (
-          <div className="mb-2 inline-flex items-center gap-1.5 rounded-full bg-primary/10 px-3 py-1 text-[11px] font-semibold uppercase tracking-wider text-primary">
+          <div className="mb-2.5 inline-flex items-center gap-1.5 rounded-full bg-primary/10 px-3 py-1 text-[11px] font-medium uppercase tracking-wider text-primary border border-primary/20">
             <Sparkles className="h-3 w-3" />
             <span>{eyebrow}</span>
           </div>
         ) : null}
-        <h1 className="font-display text-3xl font-bold tracking-tight text-foreground sm:text-4xl leading-tight">
+        <h1 className="font-display text-2xl font-bold tracking-tight text-foreground sm:text-3xl lg:text-4xl leading-tight">
           {title}
         </h1>
         {description ? (
-          <p className="mt-2 text-sm text-muted-foreground sm:text-base leading-relaxed">
+          <p className="mt-2 text-sm text-muted-foreground sm:text-base leading-relaxed max-w-2xl">
             {description}
           </p>
         ) : null}
@@ -64,13 +66,13 @@ export function Panel({
       className={cn("surface-panel fade-rise p-5 sm:p-7 relative overflow-hidden", className)}
     >
       {title ? (
-        <div className="mb-6 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between border-b border-border/50 pb-4">
+        <div className="mb-6 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between border-b border-border/60 pb-4">
           <div className="min-w-0">
-            <h2 className="font-display text-lg font-bold tracking-tight text-foreground sm:text-xl">
+            <h2 className="font-display text-base font-semibold tracking-tight text-foreground sm:text-lg">
               {title}
             </h2>
             {description ? (
-              <p className="mt-1 text-xs text-muted-foreground sm:text-sm">{description}</p>
+              <p className="mt-0.5 text-xs text-muted-foreground sm:text-sm">{description}</p>
             ) : null}
           </div>
           {action ? <div className="shrink-0">{action}</div> : null}
@@ -95,18 +97,18 @@ export function StatCard({
   return (
     <div className="surface-panel hover-lift fade-rise p-5 flex flex-col justify-between">
       <div className="flex items-start justify-between gap-3">
-        <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+        <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
           {label}
         </p>
         {icon ? (
-          <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-primary/10 text-primary shadow-subtle">
+          <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-primary/10 text-primary shadow-subtle border border-primary/15">
             {icon}
           </span>
         ) : null}
       </div>
       <div className="mt-4">
-        <p className="font-display text-3xl font-bold tracking-tight text-foreground">{value}</p>
-        {hint ? <p className="mt-1.5 text-xs text-muted-foreground font-medium">{hint}</p> : null}
+        <p className="font-display text-2xl sm:text-3xl font-bold tracking-tight text-foreground">{value}</p>
+        {hint ? <p className="mt-1 text-xs text-muted-foreground font-normal">{hint}</p> : null}
       </div>
     </div>
   );
@@ -115,7 +117,7 @@ export function StatCard({
 export function StatusBadge({ status }: { status?: string | null }) {
   const value = (status ?? "unknown").toString().toLowerCase();
 
-  let tone = "bg-muted text-muted-foreground border-border/50";
+  let tone = "bg-muted text-muted-foreground border-border/60";
   let dotColor = "bg-muted-foreground";
 
   if (
@@ -124,7 +126,7 @@ export function StatusBadge({ status }: { status?: string | null }) {
     value.includes("inactive") ||
     value.includes("suspend")
   ) {
-    tone = "bg-destructive/10 text-destructive border-destructive/20";
+    tone = "bg-destructive/10 text-destructive border-destructive/25";
     dotColor = "bg-destructive";
   } else if (value.includes("complete") || value.includes("done")) {
     tone = "bg-secondary text-secondary-foreground border-border";
@@ -145,7 +147,7 @@ export function StatusBadge({ status }: { status?: string | null }) {
   return (
     <span
       className={cn(
-        "inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-semibold capitalize border shadow-subtle tracking-wide",
+        "inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-medium capitalize border shadow-subtle tracking-wide",
         tone,
       )}
     >
@@ -167,7 +169,7 @@ export function EmptyState({
   icon?: ReactNode;
 }) {
   return (
-    <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-border/80 bg-surface/60 px-6 py-12 text-center fade-rise">
+    <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-border/80 bg-surface/40 px-6 py-12 text-center fade-rise">
       <div className="grid h-12 w-12 place-items-center rounded-2xl bg-secondary/80 text-muted-foreground shadow-subtle mb-3">
         {icon || <HelpCircle className="h-6 w-6 opacity-60" />}
       </div>
@@ -200,6 +202,58 @@ export function LoadingRows({ rows = 3 }: { rows?: number }) {
           <Skeleton className="h-8 w-20 rounded-xl shrink-0 hidden sm:block" />
         </div>
       ))}
+    </div>
+  );
+}
+
+export function AppointmentSkeleton() {
+  return (
+    <div className="rounded-2xl border border-border/60 bg-card p-5 shadow-subtle space-y-4">
+      <div className="flex items-center justify-between">
+        <div className="space-y-1.5">
+          <Skeleton className="h-5 w-36 rounded-md" />
+          <Skeleton className="h-3.5 w-24 rounded-md" />
+        </div>
+        <Skeleton className="h-6 w-20 rounded-full" />
+      </div>
+      <Skeleton className="h-4 w-48 rounded-md" />
+      <Skeleton className="h-12 w-full rounded-xl" />
+    </div>
+  );
+}
+
+export function DoctorCardSkeleton() {
+  return (
+    <div className="surface-panel p-5 space-y-4">
+      <div className="flex items-center gap-3.5">
+        <Skeleton className="h-12 w-12 rounded-2xl shrink-0" />
+        <div className="space-y-2 w-full">
+          <Skeleton className="h-4 w-40 rounded-md" />
+          <Skeleton className="h-3.5 w-28 rounded-md" />
+        </div>
+      </div>
+      <div className="space-y-1.5">
+        <Skeleton className="h-3 w-32 rounded-md" />
+        <Skeleton className="h-3 w-48 rounded-md" />
+      </div>
+      <Skeleton className="h-9 w-full rounded-xl" />
+    </div>
+  );
+}
+
+export function PrescriptionSkeleton() {
+  return (
+    <div className="surface-panel p-5 space-y-3.5">
+      <div className="flex items-center justify-between">
+        <Skeleton className="h-5 w-44 rounded-md" />
+        <Skeleton className="h-5 w-16 rounded-full" />
+      </div>
+      <Skeleton className="h-3.5 w-32 rounded-md" />
+      <Skeleton className="h-16 w-full rounded-xl" />
+      <div className="flex gap-2 pt-2">
+        <Skeleton className="h-8 flex-1 rounded-xl" />
+        <Skeleton className="h-8 flex-1 rounded-xl" />
+      </div>
     </div>
   );
 }

@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { CheckCircle2, Loader2, ArrowRight } from "lucide-react";
+import { CheckCircle2, Loader2, ArrowRight, ShieldCheck } from "lucide-react";
 import { toast } from "sonner";
 import { authApi } from "@/lib/api";
 import { Button } from "@/components/ui/button";
@@ -14,16 +14,16 @@ export const Route = createFileRoute("/signup")({
   ssr: false,
   head: () => ({
     meta: [
-      { title: "Create patient account — CityCare" },
+      { title: "Register Patient Account — Medihub / CityCare" },
       {
         name: "description",
         content:
-          "Register as a CityCare patient to book appointments with hospitals across the network.",
+          "Register as a Medihub patient to schedule doctor appointments and access digital medical records.",
       },
-      { property: "og:title", content: "Create patient account — CityCare" },
+      { property: "og:title", content: "Register Patient Account — Medihub" },
       {
         property: "og:description",
-        content: "Register in under a minute and book your first specialist appointment.",
+        content: "Register in under a minute and book your first specialist consultation.",
       },
     ],
   }),
@@ -84,19 +84,19 @@ function SignupPage() {
 
   return (
     <AuthLayout
-      title="Your personal healthcare hub, unified and secure."
-      subtitle="Register as a patient to schedule doctor visits, review consultation history, and download official medical prescriptions."
+      title="Your unified personal healthcare workspace."
+      subtitle="Register as a patient to schedule doctor visits, review consultation history, and download authenticated medical prescriptions."
     >
       {done ? (
         <div className="py-8 text-center space-y-4 fade-rise">
-          <div className="mx-auto grid h-16 w-16 place-items-center rounded-2xl bg-success/15 text-success shadow-subtle">
+          <div className="mx-auto grid h-16 w-16 place-items-center rounded-2xl bg-success/15 text-success shadow-subtle border border-success/20">
             <CheckCircle2 className="h-10 w-10" />
           </div>
           <h2 className="font-display text-2xl font-bold tracking-tight text-foreground">
-            Welcome to CityCare!
+            Welcome to Medihub!
           </h2>
-          <p className="text-sm text-muted-foreground">
-            Your patient account has been created. Redirecting to sign in…
+          <p className="text-xs sm:text-sm text-muted-foreground">
+            Your patient account has been verified. Redirecting to sign in…
           </p>
         </div>
       ) : (
@@ -105,8 +105,8 @@ function SignupPage() {
             <h2 className="font-display text-2xl font-bold tracking-tight text-foreground">
               Create Patient Account
             </h2>
-            <p className="mt-1 text-sm text-muted-foreground">
-              Join CityCare in under a minute to book consultations.
+            <p className="mt-1 text-xs sm:text-sm text-muted-foreground">
+              Join the Medihub clinical network in under a minute to book specialist visits.
             </p>
           </div>
 
@@ -123,7 +123,7 @@ function SignupPage() {
                 className={cn(
                   fieldInputClass,
                   errors.first_name && fieldErrorClass,
-                  "rounded-xl h-11",
+                  "rounded-xl h-11 text-sm",
                 )}
               />
             </Field>
@@ -138,7 +138,7 @@ function SignupPage() {
                 className={cn(
                   fieldInputClass,
                   errors.last_name && fieldErrorClass,
-                  "rounded-xl h-11",
+                  "rounded-xl h-11 text-sm",
                 )}
               />
             </Field>
@@ -149,10 +149,10 @@ function SignupPage() {
               id="email"
               type="email"
               autoComplete="email"
-              placeholder="you@example.com"
+              placeholder="jane@example.com"
               value={form.email}
               onChange={(e) => update("email", e.target.value)}
-              className={cn(fieldInputClass, errors.email && fieldErrorClass, "rounded-xl h-11")}
+              className={cn(fieldInputClass, errors.email && fieldErrorClass, "rounded-xl h-11 text-sm")}
             />
           </Field>
 
@@ -164,7 +164,7 @@ function SignupPage() {
               placeholder="+91 98765 43210"
               value={form.mobile}
               onChange={(e) => update("mobile", e.target.value)}
-              className={cn(fieldInputClass, errors.mobile && fieldErrorClass, "rounded-xl h-11")}
+              className={cn(fieldInputClass, errors.mobile && fieldErrorClass, "rounded-xl h-11 text-sm")}
             />
           </Field>
 
@@ -176,22 +176,22 @@ function SignupPage() {
               placeholder="••••••••"
               value={form.password}
               onChange={(e) => update("password", e.target.value)}
-              className={cn(fieldInputClass, errors.password && fieldErrorClass, "rounded-xl h-11")}
+              className={cn(fieldInputClass, errors.password && fieldErrorClass, "rounded-xl h-11 text-sm")}
             />
           </Field>
 
           <Button
             type="submit"
             size="lg"
-            className="w-full rounded-xl font-semibold shadow-soft tap-feedback h-11 mt-2"
+            className="w-full rounded-xl font-bold shadow-soft tap-feedback h-11 mt-2"
             disabled={submitting}
           >
             {submitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
             Complete Registration
           </Button>
 
-          <div className="pt-2 text-center">
-            <p className="text-sm text-muted-foreground">
+          <div className="pt-2 text-center border-t border-border/50">
+            <p className="text-xs sm:text-sm text-muted-foreground">
               Already have an account?{" "}
               <Link
                 to="/"

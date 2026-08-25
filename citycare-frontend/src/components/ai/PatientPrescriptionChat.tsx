@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Bot, Send, Sparkles, Loader2, HelpCircle } from "lucide-react";
+import { Bot, Send, Sparkles, Loader2, HelpCircle, ShieldAlert } from "lucide-react";
 import { patientAiApi } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -7,8 +7,8 @@ import { Panel } from "@/components/ui-kit";
 
 const SUGGESTIONS = [
   "What medicines did my doctor prescribe?",
-  "How often should I take my medications?",
-  "Are there any specific dietary instructions?",
+  "How often should I take my prescribed medications?",
+  "Are there any specific dietary guidelines with my prescription?",
 ];
 
 export function PatientPrescriptionChat() {
@@ -25,7 +25,7 @@ export function PatientPrescriptionChat() {
       const res = await patientAiApi.chat({ message: textToSend });
       setReply(res.reply);
     } catch (error) {
-      setReply(error instanceof Error ? error.message : "Could not contact the health assistant.");
+      setReply(error instanceof Error ? error.message : "Could not reach the Medihub medical assistant.");
     } finally {
       setLoading(false);
     }
@@ -33,8 +33,8 @@ export function PatientPrescriptionChat() {
 
   return (
     <Panel
-      title="AI Prescription & Health Assistant"
-      description="Instant answers regarding dosage, schedules, and guidance extracted from your verified prescriptions."
+      title="AI Clinical & Prescription Assistant"
+      description="Instant answers regarding dosage, schedules, and clinical guidance extracted from your verified prescriptions."
     >
       <div className="space-y-4">
         {/* Suggested Prompts */}
@@ -59,19 +59,19 @@ export function PatientPrescriptionChat() {
             onKeyDown={(e) => {
               if (e.key === "Enter") void ask();
             }}
-            placeholder="Ask about your prescribed medicines, dosage instructions…"
+            placeholder="Ask about your prescribed medicines, dosage instructions, precautions…"
             className="rounded-xl h-11 border-border bg-background text-sm"
           />
           <Button
             onClick={() => void ask()}
             disabled={loading || !message.trim()}
-            className="rounded-xl font-semibold shadow-soft tap-feedback h-11 px-5"
+            className="rounded-xl font-semibold shadow-soft tap-feedback h-11 px-5 shrink-0"
           >
             {loading ? (
               <Loader2 className="h-4 w-4 animate-spin" />
             ) : (
               <>
-                <Send className="mr-1.5 h-4 w-4" /> Ask
+                <Send className="mr-1.5 h-4 w-4" /> Ask AI
               </>
             )}
           </Button>
@@ -79,18 +79,20 @@ export function PatientPrescriptionChat() {
 
         {/* Response Bubble */}
         {reply ? (
-          <div className="rounded-2xl border border-primary/20 bg-primary/5 p-4 sm:p-5 text-sm space-y-2 fade-rise">
+          <div className="rounded-2xl border border-primary/20 bg-primary/5 p-4 sm:p-5 text-sm space-y-2.5 fade-rise">
             <div className="flex items-center gap-2 text-primary font-bold text-xs">
               <Bot className="h-4 w-4" />
-              <span>CityCare Medical AI</span>
+              <span>Medihub Clinical AI</span>
             </div>
             <p className="text-foreground leading-relaxed text-xs sm:text-sm whitespace-pre-wrap">
               {reply}
             </p>
-            <p className="text-[10px] text-muted-foreground pt-1 border-t border-primary/10">
-              Disclaimer: AI responses are for informational purposes only. Consult your doctor for
-              personal medical advice.
-            </p>
+            <div className="flex items-center gap-1.5 text-[10px] text-muted-foreground pt-2 border-t border-primary/10">
+              <ShieldAlert className="h-3 w-3 shrink-0" />
+              <span>
+                Disclaimer: AI responses are for guidance only. Consult your attending physician for emergency or personal medical changes.
+              </span>
+            </div>
           </div>
         ) : null}
       </div>

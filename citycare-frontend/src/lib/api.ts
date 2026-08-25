@@ -143,12 +143,28 @@ export async function apiFetch<T>(
   }
 
   let response: Response;
+  const init: RequestInit = { method, headers };
+  if (body !== undefined) init.body = JSON.stringify(body);
+
   try {
-    const init: RequestInit = { method, headers };
-    if (body !== undefined) init.body = JSON.stringify(body);
     response = await fetch(`${API_BASE_URL}${path}`, init);
-  } catch {
-    throw new ApiError("Can't reach the CityCare server. Please try again.", 0);
+  } catch (err) {
+    // If localhost failed (e.g. IPv6 resolution issue in browser), fallback to 127.0.0.1
+    const fallbackBase = API_BASE_URL.includes("localhost")
+      ? API_BASE_URL.replace("localhost", "127.0.0.1")
+      : API_BASE_URL.includes("127.0.0.1")
+        ? API_BASE_URL.replace("127.0.0.1", "localhost")
+        : null;
+
+    if (fallbackBase) {
+      try {
+        response = await fetch(`${fallbackBase}${path}`, init);
+      } catch {
+        throw new ApiError("Can't reach the CityCare server. Please try again.", 0);
+      }
+    } else {
+      throw new ApiError("Can't reach the CityCare server. Please try again.", 0);
+    }
   }
 
   const text = await response.text();

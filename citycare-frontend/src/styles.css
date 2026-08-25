@@ -5,8 +5,10 @@
 @custom-variant dark (&:is(.dark *));
 
 /*
- * CityCare Apple-Grade Healthcare Design System
- * Calm teal & sapphire neutrals, luminous glass surfaces, refined typography, and tactile feedback.
+ * Medihub / CityCare Production Healthcare Design System
+ * Inspired by Apple HIG (clarity, restraint, fluid springs, optical typography)
+ * and Kokonut UI (contemporary SaaS cards, subtle micro-interactions, clean controls).
+ * Typography: Helvetica Neue font family.
  */
 
 @theme inline {
@@ -19,16 +21,15 @@
   --radius-3xl: calc(var(--radius) + 14px);
   --radius-full: 9999px;
 
-  --font-display:
-    -apple-system, BlinkMacSystemFont, "SF Pro Display", "Fraunces", "Plus Jakarta Sans", system-ui,
-    sans-serif;
-  --font-sans:
-    -apple-system, BlinkMacSystemFont, "SF Pro Text", "Inter", "Source Sans 3", system-ui,
-    sans-serif;
+  --font-display: "Helvetica Neue", -apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", Roboto, Arial, sans-serif;
+  --font-sans: "Helvetica Neue", -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto, Arial, sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
 
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --color-surface: var(--surface);
+  --color-surface-muted: var(--surface-muted);
+  --color-surface-elevated: var(--surface-elevated);
   --color-surface-foreground: var(--surface-foreground);
   --color-card: var(--card);
   --color-card-foreground: var(--card-foreground);
@@ -49,74 +50,100 @@
   --color-success-foreground: var(--success-foreground);
   --color-warning: var(--warning);
   --color-warning-foreground: var(--warning-foreground);
+  --color-info: var(--info);
+  --color-info-foreground: var(--info-foreground);
   --color-border: var(--border);
+  --color-border-subtle: var(--border-subtle);
   --color-input: var(--input);
   --color-ring: var(--ring);
   --color-ring-offset-background: var(--background);
 
   --shadow-subtle: 0 1px 2px 0 rgba(15, 23, 42, 0.04);
-  --shadow-soft: 0 2px 8px -2px rgba(15, 23, 42, 0.05), 0 10px 24px -8px rgba(15, 23, 42, 0.06);
-  --shadow-lift: 0 4px 12px -2px rgba(15, 23, 42, 0.08), 0 16px 36px -10px rgba(15, 23, 42, 0.1);
-  --shadow-glass: 0 8px 32px 0 rgba(0, 71, 102, 0.08);
+  --shadow-soft: 0 2px 8px -2px rgba(15, 23, 42, 0.04), 0 8px 20px -6px rgba(15, 23, 42, 0.06);
+  --shadow-lift: 0 4px 12px -2px rgba(15, 23, 42, 0.06), 0 16px 32px -8px rgba(15, 23, 42, 0.09);
+  --shadow-glass: 0 8px 32px 0 rgba(2, 132, 199, 0.06);
 }
 
 :root {
-  --radius: 1rem;
-  --background: oklch(0.985 0.005 210);
-  --foreground: oklch(0.2 0.025 230);
-  --surface: oklch(0.965 0.008 210);
-  --surface-foreground: oklch(0.2 0.025 230);
+  --radius: 0.875rem;
+  
+  /* Light Theme: Calm, bright, layered healthcare neutrals */
+  --background: oklch(0.985 0.003 220);
+  --foreground: oklch(0.17 0.02 230);
+  --surface: oklch(0.965 0.006 220);
+  --surface-muted: oklch(0.945 0.008 220);
+  --surface-elevated: oklch(1 0 0);
+  --surface-foreground: oklch(0.17 0.02 230);
   --card: oklch(1 0 0);
-  --card-foreground: oklch(0.2 0.025 230);
+  --card-foreground: oklch(0.17 0.02 230);
   --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.2 0.025 230);
-  --primary: oklch(0.52 0.12 215);
-  --primary-foreground: oklch(0.99 0.002 210);
-  --primary-soft: oklch(0.94 0.028 215);
-  --secondary: oklch(0.945 0.012 215);
-  --secondary-foreground: oklch(0.28 0.035 225);
-  --muted: oklch(0.95 0.008 215);
-  --muted-foreground: oklch(0.48 0.02 225);
-  --accent: oklch(0.935 0.022 215);
-  --accent-foreground: oklch(0.22 0.04 225);
-  --destructive: oklch(0.58 0.2 25);
-  --destructive-foreground: oklch(0.99 0.002 210);
-  --success: oklch(0.62 0.14 150);
-  --success-foreground: oklch(0.99 0.002 210);
-  --warning: oklch(0.74 0.14 70);
-  --warning-foreground: oklch(0.25 0.05 60);
-  --border: oklch(0.91 0.008 215);
-  --input: oklch(0.91 0.008 215);
-  --ring: oklch(0.52 0.12 215);
+  --popover-foreground: oklch(0.17 0.02 230);
+  
+  /* Primary: Trustworthy Clinical Cyan / Deep Teal */
+  --primary: oklch(0.50 0.135 222);
+  --primary-foreground: oklch(0.99 0.002 220);
+  --primary-soft: oklch(0.935 0.028 222);
+  
+  --secondary: oklch(0.945 0.008 220);
+  --secondary-foreground: oklch(0.24 0.03 230);
+  --muted: oklch(0.95 0.006 220);
+  --muted-foreground: oklch(0.46 0.018 230);
+  --accent: oklch(0.935 0.022 222);
+  --accent-foreground: oklch(0.20 0.035 230);
+  
+  /* Semantic Status Colors */
+  --destructive: oklch(0.58 0.19 25);
+  --destructive-foreground: oklch(0.99 0.002 220);
+  --success: oklch(0.58 0.14 152);
+  --success-foreground: oklch(0.99 0.002 220);
+  --warning: oklch(0.72 0.14 75);
+  --warning-foreground: oklch(0.22 0.04 65);
+  --info: oklch(0.58 0.12 240);
+  --info-foreground: oklch(0.99 0.002 220);
+  
+  --border: oklch(0.90 0.006 220);
+  --border-subtle: oklch(0.94 0.004 220);
+  --input: oklch(0.90 0.006 220);
+  --ring: oklch(0.50 0.135 222);
 }
 
 .dark {
-  --background: oklch(0.16 0.02 230);
-  --foreground: oklch(0.97 0.005 210);
-  --surface: oklch(0.2 0.025 230);
-  --surface-foreground: oklch(0.97 0.005 210);
-  --card: oklch(0.21 0.025 230);
-  --card-foreground: oklch(0.97 0.005 210);
-  --popover: oklch(0.21 0.025 230);
-  --popover-foreground: oklch(0.97 0.005 210);
-  --primary: oklch(0.68 0.12 215);
-  --primary-foreground: oklch(0.14 0.02 230);
-  --primary-soft: oklch(0.26 0.04 215);
-  --secondary: oklch(0.26 0.025 230);
-  --secondary-foreground: oklch(0.97 0.005 210);
-  --muted: oklch(0.25 0.02 230);
-  --muted-foreground: oklch(0.7 0.015 215);
-  --accent: oklch(0.28 0.035 215);
-  --accent-foreground: oklch(0.97 0.005 210);
-  --destructive: oklch(0.65 0.18 25);
-  --destructive-foreground: oklch(0.99 0.002 210);
-  --success: oklch(0.7 0.13 150);
-  --success-foreground: oklch(0.14 0.02 230);
-  --warning: oklch(0.78 0.13 70);
-  --warning-foreground: oklch(0.2 0.04 60);
-  --border: oklch(0.28 0.02 230);
-  --input: oklch(0.28 0.02 230);
-  --ring: oklch(0.68 0.12 215);
+  /* Dark Theme: Deep midnight slate, layered elevations, calm contrast */
+  --background: oklch(0.14 0.018 235);
+  --foreground: oklch(0.97 0.004 220);
+  --surface: oklch(0.18 0.022 235);
+  --surface-muted: oklch(0.21 0.022 235);
+  --surface-elevated: oklch(0.22 0.025 235);
+  --surface-foreground: oklch(0.97 0.004 220);
+  --card: oklch(0.19 0.022 235);
+  --card-foreground: oklch(0.97 0.004 220);
+  --popover: oklch(0.20 0.025 235);
+  --popover-foreground: oklch(0.97 0.004 220);
+  
+  --primary: oklch(0.66 0.13 220);
+  --primary-foreground: oklch(0.12 0.02 235);
+  --primary-soft: oklch(0.24 0.04 222);
+  
+  --secondary: oklch(0.23 0.022 235);
+  --secondary-foreground: oklch(0.97 0.004 220);
+  --muted: oklch(0.22 0.018 235);
+  --muted-foreground: oklch(0.68 0.015 225);
+  --accent: oklch(0.26 0.032 222);
+  --accent-foreground: oklch(0.97 0.004 220);
+  
+  --destructive: oklch(0.64 0.17 25);
+  --destructive-foreground: oklch(0.99 0.002 220);
+  --success: oklch(0.68 0.13 152);
+  --success-foreground: oklch(0.12 0.02 235);
+  --warning: oklch(0.76 0.13 75);
+  --warning-foreground: oklch(0.18 0.04 65);
+  --info: oklch(0.68 0.12 240);
+  --info-foreground: oklch(0.12 0.02 235);
+  
+  --border: oklch(0.26 0.018 235);
+  --border-subtle: oklch(0.21 0.015 235);
+  --input: oklch(0.26 0.018 235);
+  --ring: oklch(0.66 0.13 220);
 }
 
 @layer base {
@@ -136,36 +163,48 @@
     text-rendering: optimizeLegibility;
   }
 
-  h1,
-  h2,
-  h3,
-  h4,
-  .font-display {
+  /* Helvetica Neue Optical Hierarchy */
+  h1, .text-display-1 {
     font-family: var(--font-display);
-    letter-spacing: -0.025em;
-    font-weight: 600;
+    letter-spacing: -0.028em;
+    font-weight: 700;
+    line-height: 1.15;
   }
 
-  /* Smooth keyboard focus rings */
+  h2, .text-display-2 {
+    font-family: var(--font-display);
+    letter-spacing: -0.024em;
+    font-weight: 600;
+    line-height: 1.25;
+  }
+
+  h3, h4, .text-display-3 {
+    font-family: var(--font-display);
+    letter-spacing: -0.018em;
+    font-weight: 600;
+    line-height: 1.35;
+  }
+
+  /* Precision Keyboard Focus Rings */
   :focus-visible {
     outline: 2px solid var(--color-ring);
     outline-offset: 2px;
   }
 }
 
-/* Glass & Surface Utilities */
+/* Glass & Luminous Surface Utilities */
 @utility glass-header {
   background-color: color-mix(in oklch, var(--color-background) 82%, transparent);
   backdrop-filter: blur(20px) saturate(180%);
   -webkit-backdrop-filter: blur(20px) saturate(180%);
-  border-bottom: 1px solid color-mix(in oklch, var(--color-border) 60%, transparent);
+  border-bottom: 1px solid color-mix(in oklch, var(--color-border) 70%, transparent);
 }
 
 @utility glass-panel {
   background-color: color-mix(in oklch, var(--color-card) 85%, transparent);
   backdrop-filter: blur(16px) saturate(160%);
   -webkit-backdrop-filter: blur(16px) saturate(160%);
-  border: 1px solid color-mix(in oklch, var(--color-border) 70%, transparent);
+  border: 1px solid color-mix(in oklch, var(--color-border) 75%, transparent);
   border-radius: var(--radius-2xl);
   box-shadow: var(--shadow-soft);
 }
@@ -177,14 +216,16 @@
   box-shadow: var(--shadow-subtle);
   transition:
     border-color 200ms ease,
-    box-shadow 200ms ease;
+    box-shadow 200ms ease,
+    transform 200ms cubic-bezier(0.16, 1, 0.3, 1);
 }
 
+/* Apple Spring Tactile Interactions */
 @utility hover-lift {
   transition:
-    transform 240ms cubic-bezier(0.16, 1, 0.3, 1),
-    box-shadow 240ms cubic-bezier(0.16, 1, 0.3, 1),
-    border-color 200ms ease;
+    transform 220ms cubic-bezier(0.16, 1, 0.3, 1),
+    box-shadow 220ms cubic-bezier(0.16, 1, 0.3, 1),
+    border-color 180ms ease;
   &:hover {
     transform: translateY(-2px);
     box-shadow: var(--shadow-lift);
@@ -196,8 +237,8 @@
 
 @utility tap-feedback {
   transition:
-    transform 150ms cubic-bezier(0.16, 1, 0.3, 1),
-    opacity 150ms ease;
+    transform 120ms cubic-bezier(0.16, 1, 0.3, 1),
+    opacity 120ms ease;
   &:active {
     transform: scale(0.97);
     opacity: 0.92;
@@ -205,7 +246,7 @@
 }
 
 @utility fade-rise {
-  animation: fade-rise 360ms cubic-bezier(0.16, 1, 0.3, 1) both;
+  animation: fade-rise 320ms cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 
 @keyframes fade-rise {
@@ -252,8 +293,12 @@
 /* Accessibility: High Contrast */
 @media (prefers-contrast: more) {
   :root {
-    --border: oklch(0.65 0.01 215);
-    --foreground: oklch(0.08 0 0);
+    --border: oklch(0.60 0.01 220);
+    --foreground: oklch(0.05 0 0);
+  }
+  .dark {
+    --border: oklch(0.45 0.01 220);
+    --foreground: oklch(0.99 0 0);
   }
   * {
     border-color: var(--border) !important;

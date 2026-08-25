@@ -1,11 +1,10 @@
 import { useState } from "react";
-import { Minus, Plus, Stethoscope, FileText, Loader2, Pill, CheckCircle2 } from "lucide-react";
+import { Minus, Plus, Stethoscope, FileText, Loader2, Pill, CheckCircle2, ShieldCheck } from "lucide-react";
 import { toast } from "sonner";
 import { prescriptionsApi, type Medicine } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { Field } from "@/components/Field";
 
 const blank = (): Medicine => ({
   name: "",
@@ -50,7 +49,7 @@ export function PrescriptionForm({
         medicines: validMeds,
         general_instructions: instructions.trim(),
       });
-      toast.success("Prescription generated & PDF uploaded to Cloudinary");
+      toast.success("Prescription signed and issued to patient record");
       onDone();
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Could not generate prescription");
@@ -64,29 +63,32 @@ export function PrescriptionForm({
       onSubmit={submit}
       className="mt-4 space-y-5 rounded-2xl border border-primary/20 bg-card p-5 sm:p-6 shadow-soft fade-rise"
     >
-      <div className="flex items-center justify-between border-b border-border/50 pb-3">
-        <div className="flex items-center gap-2">
-          <span className="grid h-7 w-7 place-items-center rounded-lg bg-primary/10 text-primary">
+      <div className="flex items-center justify-between border-b border-border/50 pb-3.5">
+        <div className="flex items-center gap-2.5">
+          <span className="grid h-8 w-8 place-items-center rounded-xl bg-primary/10 text-primary">
             <Stethoscope className="h-4 w-4" />
           </span>
-          <h4 className="font-display text-base font-bold text-foreground">
-            Issue Medical Prescription
-          </h4>
+          <div>
+            <h4 className="font-display text-base font-bold text-foreground">
+              Issue Official Prescription
+            </h4>
+            <p className="text-xs text-muted-foreground">Digital signature will be affixed</p>
+          </div>
         </div>
-        <span className="text-xs text-muted-foreground font-mono">
+        <span className="text-xs text-muted-foreground font-mono bg-secondary/70 px-2.5 py-1 rounded-lg">
           Appt #{String(appointmentId).slice(-6)}
         </span>
       </div>
 
       <div className="space-y-4">
         <div>
-          <label className="block text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-1">
+          <label className="block text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-1.5">
             Clinical Diagnosis *
           </label>
           <Input
             value={diagnosis}
             onChange={(e) => setDiagnosis(e.target.value)}
-            placeholder="e.g. Acute Bronchitis, Seasonal Allergic Rhinitis"
+            placeholder="e.g. Acute Bronchitis, Seasonal Allergic Rhinitis, Type 2 Diabetes"
             className="rounded-xl h-11 border-border bg-background text-sm font-medium"
             required
           />
@@ -96,7 +98,7 @@ export function PrescriptionForm({
         <div className="space-y-3">
           <div className="flex items-center justify-between">
             <label className="block text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-              Prescribed Medications
+              Prescribed Medications *
             </label>
             <Button
               type="button"
@@ -105,7 +107,7 @@ export function PrescriptionForm({
               onClick={() => setMedicines((all) => [...all, blank()])}
               className="rounded-xl text-xs font-semibold tap-feedback"
             >
-              <Plus className="mr-1 h-3.5 w-3.5" /> Add Medicine
+              <Plus className="mr-1 h-3.5 w-3.5" /> Add Medication
             </Button>
           </div>
 
@@ -117,7 +119,7 @@ export function PrescriptionForm({
               >
                 <div className="flex items-center justify-between">
                   <span className="text-xs font-bold text-foreground flex items-center gap-1.5">
-                    <Pill className="h-3.5 w-3.5 text-primary" /> Medicine {index + 1}
+                    <Pill className="h-3.5 w-3.5 text-primary" /> Medication #{index + 1}
                   </span>
                   {medicines.length > 1 ? (
                     <Button
@@ -136,8 +138,9 @@ export function PrescriptionForm({
                   <Input
                     value={medicine.name}
                     onChange={(e) => update(index, "name", e.target.value)}
-                    placeholder="Medicine Name (e.g. Amoxicillin)"
+                    placeholder="Medication Name (e.g. Amoxicillin)"
                     className="rounded-xl h-10 border-border bg-background text-xs"
+                    required
                   />
                   <Input
                     value={medicine.dosage}
@@ -160,7 +163,7 @@ export function PrescriptionForm({
                   <Input
                     value={medicine.instructions}
                     onChange={(e) => update(index, "instructions", e.target.value)}
-                    placeholder="Instructions (e.g. After Food)"
+                    placeholder="Instructions (e.g. After Food, With water)"
                     className="rounded-xl h-10 border-border bg-background text-xs sm:col-span-2"
                   />
                 </div>
@@ -170,15 +173,15 @@ export function PrescriptionForm({
         </div>
 
         <div>
-          <label className="block text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-1">
-            General Advice & Instructions
+          <label className="block text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-1.5">
+            General Advice & Patient Instructions
           </label>
           <Textarea
             value={instructions}
             onChange={(e) => setInstructions(e.target.value)}
-            placeholder="Hydration, follow-up recommendations, precautions…"
+            placeholder="Hydration guidelines, follow-up recommendations, dietary precautions…"
             rows={3}
-            className="rounded-xl border-border bg-background text-xs"
+            className="rounded-xl border-border bg-background text-xs leading-relaxed"
           />
         </div>
       </div>
@@ -195,14 +198,14 @@ export function PrescriptionForm({
         <Button
           type="submit"
           disabled={saving}
-          className="rounded-xl font-bold shadow-soft tap-feedback"
+          className="rounded-xl font-semibold shadow-soft tap-feedback"
         >
           {saving ? (
             <Loader2 className="mr-2 h-4 w-4 animate-spin" />
           ) : (
-            <FileText className="mr-2 h-4 w-4" />
+            <ShieldCheck className="mr-2 h-4 w-4" />
           )}
-          {saving ? "Generating PDF & Uploading…" : "Save & Issue Prescription"}
+          {saving ? "Signing & Generating PDF…" : "Sign & Issue Prescription"}
         </Button>
       </div>
     </form>

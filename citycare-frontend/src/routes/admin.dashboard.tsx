@@ -59,12 +59,12 @@ export const Route = createFileRoute("/admin/dashboard")({
   ssr: false,
   head: () => ({
     meta: [
-      { title: "Network administration — CityCare" },
+      { title: "Network Administration — Medihub / CityCare" },
       {
         name: "description",
-        content: "Super admin control for CityCare hospitals, managers, doctors and user accounts.",
+        content: "Hospital management, medical staffing, and user governance across the clinical network.",
       },
-      { property: "og:title", content: "Network administration — CityCare" },
+      { property: "og:title", content: "Network Administration — Medihub" },
       {
         property: "og:description",
         content: "Hospitals and users across the whole CityCare network.",
@@ -108,7 +108,7 @@ function AdminDashboard() {
       return adminApi.updateHospital(hospital.id, { status: active ? "inactive" : "active" });
     },
     onSuccess: () => {
-      toast.success("Hospital status updated");
+      toast.success("Hospital status updated successfully");
       invalidateHospitals();
     },
     onError: (error) =>
@@ -149,38 +149,38 @@ function AdminDashboard() {
   }, [userList, userSearch, roleFilter]);
 
   return (
-    <div className="space-y-8 max-w-7xl mx-auto pb-12">
+    <div className="space-y-8 max-w-7xl mx-auto pb-16">
       <PageHeader
         eyebrow="Network Oversight"
-        title="System Administration"
-        description="Comprehensive control over hospital branches, medical staff assignments, and user accounts across the CityCare network."
+        title="Network Administration"
+        description="Comprehensive governance over hospital branches, medical staff rosters, and clinical user accounts across the Medihub network."
       />
 
       {/* Network Metrics */}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <StatCard
-          label="Hospital Branches"
+          label="Hospital Facilities"
           value={hospitalList.length}
           icon={<Building2 className="h-4 w-4" />}
-          hint="Active facilities"
+          hint="Registered branches"
         />
         <StatCard
-          label="Registered Users"
+          label="Total User Accounts"
           value={userList.length}
           icon={<Users className="h-4 w-4" />}
-          hint="Across all roles"
+          hint="Across all permissions"
         />
         <StatCard
-          label="Physicians"
+          label="Practicing Physicians"
           value={userList.filter((u) => u.role === "doctor").length}
           icon={<Stethoscope className="h-4 w-4" />}
           hint="Active clinical staff"
         />
         <StatCard
-          label="Patient Accounts"
+          label="Verified Patients"
           value={userList.filter((u) => u.role === "customer").length}
           icon={<ShieldCheck className="h-4 w-4" />}
-          hint="Verified patients"
+          hint="Registered patient accounts"
         />
       </div>
 
@@ -188,13 +188,13 @@ function AdminDashboard() {
         <TabsList className="h-auto flex-wrap rounded-2xl bg-secondary/60 p-1.5 border border-border/60">
           <TabsTrigger
             value="hospitals"
-            className="rounded-xl px-5 py-2 text-xs font-bold tap-feedback"
+            className="rounded-xl px-5 py-2 text-xs font-semibold tap-feedback"
           >
-            Hospitals ({hospitalList.length})
+            Hospital Branches ({hospitalList.length})
           </TabsTrigger>
           <TabsTrigger
             value="users"
-            className="rounded-xl px-5 py-2 text-xs font-bold tap-feedback"
+            className="rounded-xl px-5 py-2 text-xs font-semibold tap-feedback"
           >
             User Directory ({userList.length})
           </TabsTrigger>
@@ -457,14 +457,14 @@ function HospitalDialog({ hospital, onDone }: { hospital?: Hospital; onDone: () 
             <Edit2 className="mr-1.5 h-3.5 w-3.5" /> Edit
           </Button>
         ) : (
-          <Button size="sm" className="rounded-xl font-bold shadow-soft tap-feedback">
+          <Button size="sm" className="rounded-xl font-semibold shadow-soft tap-feedback">
             <Plus className="mr-1.5 h-4 w-4" /> New Hospital Branch
           </Button>
         )}
       </DialogTrigger>
       <DialogContent className="rounded-2xl sm:max-w-lg">
         <DialogHeader>
-          <DialogTitle className="font-display text-xl font-bold">
+          <DialogTitle className="font-display text-lg font-bold">
             {editing ? "Edit Hospital Branch" : "Register Hospital Branch"}
           </DialogTitle>
         </DialogHeader>
@@ -539,7 +539,7 @@ function HospitalDialog({ hospital, onDone }: { hospital?: Hospital; onDone: () 
           <DialogFooter className="sm:col-span-2 pt-2">
             <Button
               type="submit"
-              className="rounded-xl font-bold shadow-soft tap-feedback"
+              className="rounded-xl font-semibold shadow-soft tap-feedback"
               disabled={mutation.isPending}
             >
               {mutation.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
@@ -597,7 +597,7 @@ function StaffDialog({
         <Button
           size="sm"
           variant={kind === "manager" ? "outline" : "default"}
-          className="rounded-xl text-xs font-bold tap-feedback"
+          className="rounded-xl text-xs font-semibold tap-feedback"
         >
           <UserPlus className="mr-1.5 h-3.5 w-3.5" /> New{" "}
           {kind === "manager" ? "Manager" : "Doctor"}
@@ -605,7 +605,7 @@ function StaffDialog({
       </DialogTrigger>
       <DialogContent className="rounded-2xl sm:max-w-lg">
         <DialogHeader>
-          <DialogTitle className="font-display text-xl font-bold">
+          <DialogTitle className="font-display text-lg font-bold">
             Create {kind === "manager" ? "Hospital Manager" : "Specialist Physician"}
           </DialogTitle>
         </DialogHeader>
@@ -716,7 +716,7 @@ function StaffDialog({
           <DialogFooter className="sm:col-span-2 pt-2">
             <Button
               type="submit"
-              className="rounded-xl font-bold shadow-soft tap-feedback"
+              className="rounded-xl font-semibold shadow-soft tap-feedback"
               disabled={mutation.isPending}
             >
               {mutation.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}

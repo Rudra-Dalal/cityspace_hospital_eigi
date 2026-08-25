@@ -11,11 +11,14 @@ import {
   HeartPulse,
   X,
   User,
+  ShieldCheck,
 } from "lucide-react";
 import { ROLE_LABEL } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
+import { ThemeToggle } from "@/components/ThemeToggle";
+import { InteractiveGradientBackground } from "@/components/InteractiveGradientBackground";
 
 type NavItem = { to: string; label: string; icon: typeof LayoutDashboard };
 
@@ -24,9 +27,9 @@ const NAV: Record<string, NavItem[]> = {
     { to: "/patient/dashboard", label: "My Appointments", icon: LayoutDashboard },
     { to: "/patient/book", label: "Book Consultation", icon: CalendarPlus },
   ],
-  doctor: [{ to: "/doctor/dashboard", label: "Clinical Schedule", icon: Stethoscope }],
-  hospital_manager: [{ to: "/manager/dashboard", label: "Hospital Management", icon: Building2 }],
-  super_admin: [{ to: "/admin/dashboard", label: "Administration", icon: Users }],
+  doctor: [{ to: "/doctor/dashboard", label: "Clinical Workspace", icon: Stethoscope }],
+  hospital_manager: [{ to: "/manager/dashboard", label: "Hospital Operations", icon: Building2 }],
+  super_admin: [{ to: "/admin/dashboard", label: "Network Admin", icon: Users }],
 };
 
 export function AppShell({ children }: { children: ReactNode }) {
@@ -46,136 +49,145 @@ export function AppShell({ children }: { children: ReactNode }) {
   }
 
   return (
-    <div className="min-h-screen bg-background text-foreground flex flex-col selection:bg-primary/20 selection:text-primary">
-      {/* Top Glass Header */}
+    <div className="min-h-screen text-foreground flex flex-col selection:bg-primary/20 selection:text-primary relative overflow-x-hidden">
+      {/* Interactive Ambient Gradient Background */}
+      <InteractiveGradientBackground showGrid={true} />
+
+      {/* Top Floating Glass Header */}
       <header className="sticky top-0 z-40 glass-header">
         <div className="mx-auto flex max-w-7xl items-center justify-between gap-4 px-4 py-2.5 sm:px-6 lg:px-8">
-          {/* Logo & Brand */}
+          {/* Logo & Brand Identity */}
           <Link
             to={user ? (items[0]?.to ?? "/") : "/"}
             className="flex items-center gap-3 tap-feedback focus-visible:rounded-xl focus-visible:outline-none"
           >
-            <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-primary text-primary-foreground shadow-sm shadow-primary/20 ring-1 ring-black/5 dark:ring-white/10">
+            <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-primary text-primary-foreground shadow-sm shadow-primary/25 ring-1 ring-black/5 dark:ring-white/10">
               <HeartPulse className="h-5 w-5" />
             </span>
-            <div className="min-w-0">
-              <span className="font-display text-lg font-bold tracking-tight text-foreground block leading-none">
-                CityCare
-              </span>
+            <div className="flex flex-col">
+              <div className="flex items-center gap-1.5">
+                <span className="font-display text-base font-bold tracking-tight text-foreground">
+                  Medihub
+                </span>
+                <span className="text-[10px] uppercase font-semibold text-primary/80 bg-primary/10 px-1.5 py-0.2 rounded">
+                  CityCare
+                </span>
+              </div>
               {user ? (
-                <span className="mt-0.5 inline-block text-[11px] font-medium text-muted-foreground leading-tight">
-                  {ROLE_LABEL[user.role]}
+                <span className="text-[11px] font-medium text-muted-foreground capitalize">
+                  {ROLE_LABEL[user.role] ?? user.role}
                 </span>
-              ) : (
-                <span className="mt-0.5 inline-block text-[11px] font-medium text-muted-foreground leading-tight">
-                  Hospital Network
-                </span>
-              )}
+              ) : null}
             </div>
           </Link>
 
-          {/* Desktop Navigation */}
-          <div className="flex items-center gap-3">
-            {items.length > 0 ? (
-              <nav className="hidden items-center gap-1 rounded-full border border-border/60 bg-secondary/50 p-1 backdrop-blur-md md:flex">
-                {items.map((item) => {
-                  const active = pathname === item.to;
-                  return (
-                    <Link
-                      key={item.to}
-                      to={item.to}
-                      className={cn(
-                        "inline-flex items-center gap-2 rounded-full px-4 py-1.5 text-xs font-semibold tracking-wide transition-all duration-200",
-                        active
-                          ? "bg-card text-foreground shadow-subtle ring-1 ring-border/50"
-                          : "text-muted-foreground hover:text-foreground hover:bg-card/40",
-                      )}
-                    >
-                      <item.icon
-                        className={cn(
-                          "h-3.5 w-3.5",
-                          active ? "text-primary" : "text-muted-foreground",
-                        )}
-                      />
-                      {item.label}
-                    </Link>
-                  );
-                })}
-              </nav>
-            ) : null}
+          {/* Desktop Navigation Tabs */}
+          {items.length > 0 ? (
+            <nav className="hidden md:flex items-center gap-1 rounded-2xl bg-secondary/50 p-1 border border-border/40 backdrop-blur-md">
+              {items.map((item) => {
+                const Icon = item.icon;
+                const active = pathname === item.to || pathname.startsWith(`${item.to}/`);
+                return (
+                  <Link
+                    key={item.to}
+                    to={item.to}
+                    className={cn(
+                      "flex items-center gap-2 rounded-xl px-4 py-1.5 text-xs font-semibold transition-all tap-feedback",
+                      active
+                        ? "bg-card text-foreground shadow-subtle border border-border/60"
+                        : "text-muted-foreground hover:text-foreground hover:bg-surface/50",
+                    )}
+                  >
+                    <Icon className={cn("h-3.5 w-3.5", active ? "text-primary" : "opacity-70")} />
+                    {item.label}
+                  </Link>
+                );
+              })}
+            </nav>
+          ) : null}
 
-            {/* User Profile & Actions */}
+          {/* Right Header Controls (Theme, User, Logout, Mobile Menu) */}
+          <div className="flex items-center gap-2.5">
+            <ThemeToggle />
+
             {user ? (
-              <div className="hidden items-center gap-2 md:flex pl-2 border-l border-border/60">
-                <div className="flex items-center gap-2 rounded-full bg-secondary/40 px-2.5 py-1 text-xs font-medium text-foreground">
-                  <span className="grid h-6 w-6 place-items-center rounded-full bg-primary/10 text-[10px] font-bold text-primary">
+              <div className="hidden sm:flex items-center gap-3 pl-2 border-l border-border/60">
+                <div className="flex items-center gap-2">
+                  <span className="grid h-8 w-8 place-items-center rounded-xl bg-primary/10 text-xs font-bold text-primary border border-primary/20">
                     {initials}
                   </span>
-                  <span className="max-w-[120px] truncate">
-                    {user.first_name} {user.last_name}
-                  </span>
+                  <div className="hidden lg:block text-left">
+                    <p className="text-xs font-bold text-foreground leading-tight">
+                      {user.first_name} {user.last_name}
+                    </p>
+                    <p className="text-[10px] text-muted-foreground truncate max-w-[120px]">
+                      {user.email}
+                    </p>
+                  </div>
                 </div>
+
                 <Button
                   variant="ghost"
-                  size="sm"
+                  size="icon"
                   onClick={handleLogout}
-                  className="rounded-full text-xs font-medium text-muted-foreground hover:text-destructive hover:bg-destructive/10 tap-feedback"
+                  title="Sign out of Medihub"
+                  className="h-8 w-8 rounded-xl text-muted-foreground hover:text-destructive hover:bg-destructive/10 tap-feedback"
                 >
-                  <LogOut className="mr-1.5 h-3.5 w-3.5" />
-                  Sign out
+                  <LogOut className="h-4 w-4" />
                 </Button>
               </div>
             ) : null}
 
-            {/* Mobile Menu Toggle Button */}
-            {items.length > 0 || user ? (
-              <Button
-                variant="ghost"
-                size="icon"
-                className="rounded-xl md:hidden tap-feedback"
-                aria-label="Toggle menu"
-                onClick={() => setOpen((v) => !v)}
-              >
-                {open ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
-              </Button>
-            ) : null}
+            {/* Mobile Hamburger Toggle */}
+            <button
+              type="button"
+              className="grid h-9 w-9 place-items-center rounded-xl border border-border/80 bg-surface/80 text-foreground md:hidden tap-feedback"
+              onClick={() => setOpen((prev) => !prev)}
+              aria-label={open ? "Close menu" : "Open menu"}
+            >
+              {open ? <X className="h-4 w-4" /> : <Menu className="h-4 w-4" />}
+            </button>
           </div>
         </div>
 
-        {/* Mobile Dropdown Sheet */}
+        {/* Mobile Navigation Drawer */}
         {open ? (
-          <div className="border-t border-border/60 bg-background/95 backdrop-blur-xl px-4 py-3 md:hidden fade-rise">
+          <div className="border-t border-border/60 bg-surface/95 backdrop-blur-xl px-4 py-4 md:hidden fade-rise">
             {user ? (
-              <div className="mb-3 flex items-center gap-3 border-b border-border/50 pb-3 px-2">
-                <span className="grid h-8 w-8 place-items-center rounded-full bg-primary/15 text-xs font-bold text-primary">
+              <div className="mb-3 flex items-center gap-3 border-b border-border/60 pb-3">
+                <span className="grid h-9 w-9 place-items-center rounded-xl bg-primary/10 text-xs font-bold text-primary border border-primary/20">
                   {initials}
                 </span>
                 <div className="min-w-0">
-                  <p className="text-sm font-semibold truncate leading-tight">
+                  <p className="text-xs font-bold text-foreground">
                     {user.first_name} {user.last_name}
                   </p>
-                  <p className="text-xs text-muted-foreground truncate">{user.email}</p>
+                  <p className="text-[11px] text-muted-foreground truncate">{user.email}</p>
                 </div>
               </div>
             ) : null}
 
-            <nav className="flex flex-col gap-1">
-              {items.map((item) => (
-                <Link
-                  key={item.to}
-                  to={item.to}
-                  onClick={() => setOpen(false)}
-                  className={cn(
-                    "flex items-center gap-2.5 rounded-xl px-3.5 py-2.5 text-sm font-medium transition-colors tap-feedback",
-                    pathname === item.to
-                      ? "bg-primary/10 text-primary font-semibold"
-                      : "text-muted-foreground hover:bg-secondary/60 hover:text-foreground",
-                  )}
-                >
-                  <item.icon className="h-4 w-4" />
-                  {item.label}
-                </Link>
-              ))}
+            <nav className="space-y-1">
+              {items.map((item) => {
+                const Icon = item.icon;
+                const active = pathname === item.to;
+                return (
+                  <Link
+                    key={item.to}
+                    to={item.to}
+                    onClick={() => setOpen(false)}
+                    className={cn(
+                      "flex items-center gap-3 rounded-xl px-3.5 py-2.5 text-xs font-semibold transition-colors tap-feedback",
+                      active
+                        ? "bg-primary text-primary-foreground font-bold shadow-soft"
+                        : "text-foreground hover:bg-surface",
+                    )}
+                  >
+                    <Icon className="h-4 w-4" />
+                    {item.label}
+                  </Link>
+                );
+              })}
 
               {user ? (
                 <button
@@ -184,7 +196,7 @@ export function AppShell({ children }: { children: ReactNode }) {
                     setOpen(false);
                     handleLogout();
                   }}
-                  className="mt-2 flex w-full items-center gap-2.5 rounded-xl px-3.5 py-2.5 text-left text-sm font-medium text-destructive transition-colors hover:bg-destructive/10 tap-feedback"
+                  className="mt-2 flex w-full items-center gap-2.5 rounded-xl px-3.5 py-2.5 text-left text-xs font-semibold text-destructive transition-colors hover:bg-destructive/10 tap-feedback"
                 >
                   <LogOut className="h-4 w-4" />
                   Sign out
@@ -195,19 +207,22 @@ export function AppShell({ children }: { children: ReactNode }) {
         ) : null}
       </header>
 
-      {/* Main Content Area */}
-      <main className="mx-auto w-full max-w-7xl flex-1 px-4 py-6 sm:px-6 lg:px-8 lg:py-10">
+      {/* Main Workspace Area */}
+      <main className="mx-auto w-full max-w-7xl flex-1 px-4 py-6 sm:px-6 lg:px-8 lg:py-10 relative z-10">
         {children}
       </main>
 
-      {/* Subtle Footer */}
-      <footer className="border-t border-border/40 py-6 text-center text-xs text-muted-foreground">
+      {/* Hospital Footer */}
+      <footer className="border-t border-border/40 py-6 text-center text-xs text-muted-foreground mt-auto relative z-10">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row items-center justify-between gap-3">
-          <p>© {new Date().getFullYear()} CityCare Hospital Network. All rights reserved.</p>
+          <div className="flex items-center gap-2">
+            <ShieldCheck className="h-4 w-4 text-primary" />
+            <span>© {new Date().getFullYear()} Medihub / CityCare Hospital Network. Verified Clinical Systems.</span>
+          </div>
           <div className="flex items-center gap-4 text-[11px]">
             <span>Calm & Secure Healthcare</span>
             <span>•</span>
-            <span>24/7 Verified Physicians</span>
+            <span>24/7 Verified Specialist Network</span>
           </div>
         </div>
       </footer>

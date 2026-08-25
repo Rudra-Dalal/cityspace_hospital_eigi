@@ -15,9 +15,9 @@ import {
   ChevronRight,
   Sparkles,
   ArrowLeft,
-  ChevronDown,
-  Info,
   CalendarCheck,
+  ShieldCheck,
+  Award,
 } from "lucide-react";
 import { toast } from "sonner";
 import { appointmentsApi, patientApi, Hospital, DoctorPublicOut } from "@/lib/api";
@@ -26,7 +26,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Field, fieldErrorClass, fieldInputClass } from "@/components/Field";
-import { EmptyState, ErrorNote, PageHeader, Panel } from "@/components/ui-kit";
+import { EmptyState, ErrorNote, PageHeader, Panel, DoctorCardSkeleton } from "@/components/ui-kit";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 import { formatDate, nextDays, toDateKey } from "@/lib/format";
@@ -46,16 +46,16 @@ export const Route = createFileRoute("/patient/book")({
   ssr: false,
   head: () => ({
     meta: [
-      { title: "Book a consultation — CityCare" },
+      { title: "Book Consultation — Medihub / CityCare" },
       {
         name: "description",
         content:
           "Select your hospital branch, choose your specialist physician, and book an appointment in real-time.",
       },
-      { property: "og:title", content: "Book a consultation — CityCare" },
+      { property: "og:title", content: "Book Consultation — Medihub" },
       {
         property: "og:description",
-        content: "Multi-hospital explicit specialist booking with real-time doctor availability.",
+        content: "Multi-hospital specialist booking with real-time doctor availability.",
       },
     ],
   }),
@@ -237,36 +237,35 @@ function BookAppointment() {
     return (
       <div className="max-w-2xl mx-auto py-8">
         <div className="surface-panel p-8 sm:p-10 text-center space-y-6 shadow-soft border-border/80 fade-rise">
-          <div className="mx-auto grid h-16 w-16 place-items-center rounded-2xl bg-success/15 text-success shadow-subtle">
+          <div className="mx-auto grid h-16 w-16 place-items-center rounded-2xl bg-success/15 text-success shadow-subtle border border-success/20">
             <CheckCircle2 className="h-10 w-10" />
           </div>
 
           <div>
-            <span className="inline-flex items-center gap-1.5 rounded-full bg-success/10 px-3 py-1 text-xs font-bold text-success uppercase tracking-wider">
-              Confirmed Booking
+            <span className="inline-flex items-center gap-1.5 rounded-full bg-success/10 px-3 py-1 text-xs font-semibold text-success uppercase tracking-wider border border-success/20">
+              <ShieldCheck className="h-3.5 w-3.5" /> Confirmed Booking
             </span>
-            <h1 className="mt-3 font-display text-3xl font-bold tracking-tight text-foreground sm:text-4xl">
-              Appointment Scheduled
+            <h1 className="mt-3 font-display text-2xl sm:text-3xl font-bold tracking-tight text-foreground">
+              Consultation Scheduled
             </h1>
-            <p className="mt-2 text-sm text-muted-foreground">
-              Your consultation has been securely recorded. Please arrive 10 minutes prior to your
-              slot.
+            <p className="mt-2 text-sm text-muted-foreground max-w-md mx-auto">
+              Your appointment has been registered with the hospital calendar. Please arrive 10 minutes prior to your time slot.
             </p>
           </div>
 
-          {/* Appointment Details Box */}
+          {/* Appointment Details Card */}
           <div className="rounded-2xl border border-border/80 bg-surface/70 p-6 text-left space-y-3.5">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-border/50 pb-3 gap-1">
-              <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                Physician
+              <span className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+                Attending Physician
               </span>
-              <span className="text-sm font-bold text-foreground">
+              <span className="text-sm font-semibold text-foreground">
                 {success.doctorName || "Assigned Specialist"}
               </span>
             </div>
 
             <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-border/50 pb-3 gap-1">
-              <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+              <span className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
                 Hospital Branch
               </span>
               <span className="text-sm font-medium text-foreground">
@@ -275,8 +274,8 @@ function BookAppointment() {
             </div>
 
             <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-border/50 pb-3 gap-1">
-              <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                Date
+              <span className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+                Appointment Date
               </span>
               <span className="text-sm font-medium text-foreground">
                 {formatDate(success.date)}
@@ -284,8 +283,8 @@ function BookAppointment() {
             </div>
 
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1">
-              <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                Time Slot
+              <span className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+                Confirmed Slot
               </span>
               <span className="text-sm font-bold text-primary">{success.slot}</span>
             </div>
@@ -296,7 +295,7 @@ function BookAppointment() {
               className="w-full sm:w-auto rounded-xl font-semibold shadow-soft tap-feedback h-11 px-6"
               onClick={() => navigate({ to: "/patient/dashboard" })}
             >
-              View My Appointments
+              Go to My Appointments
             </Button>
             <Button
               variant="outline"
@@ -311,7 +310,7 @@ function BookAppointment() {
                 setSymptoms([]);
               }}
             >
-              Schedule Another Consultation
+              Book Another Visit
             </Button>
           </div>
         </div>
@@ -320,33 +319,33 @@ function BookAppointment() {
   }
 
   return (
-    <div className="space-y-8 max-w-5xl mx-auto pb-12">
+    <div className="space-y-8 max-w-5xl mx-auto pb-16">
       <PageHeader
         eyebrow="Specialist Booking"
         title="Schedule a Medical Consultation"
-        description="Follow the steps to select a hospital branch, specialist doctor, and available time slot with zero wait times."
+        description="Select a verified hospital branch, choose your specialist physician, and confirm a real-time appointment slot."
       />
 
-      {/* Step Progress Indicator */}
+      {/* 4-Step Progress Indicator */}
       <div className="rounded-2xl border border-border/70 bg-card p-3 sm:p-4 shadow-subtle">
         <div className="grid grid-cols-4 gap-2 text-center">
           {[
             {
               step: 1,
-              label: "1. Hospital",
+              label: "1. Branch",
               active: Boolean(selectedHospital),
               current: currentStep === 1,
             },
             {
               step: 2,
-              label: "2. Doctor",
+              label: "2. Physician",
               active: Boolean(selectedDoctor),
               current: currentStep === 2,
             },
             { step: 3, label: "3. Date & Slot", active: Boolean(slot), current: currentStep === 3 },
             {
               step: 4,
-              label: "4. Confirm",
+              label: "4. Details",
               active: Boolean(slot && reason.length >= 10),
               current: currentStep === 4,
             },
@@ -356,9 +355,9 @@ function BookAppointment() {
               className={cn(
                 "flex flex-col sm:flex-row items-center justify-center gap-1.5 rounded-xl py-2 px-2 transition-all",
                 item.current
-                  ? "bg-primary/10 text-primary font-bold ring-1 ring-primary/30"
+                  ? "bg-primary/10 text-primary font-semibold ring-1 ring-primary/30"
                   : item.active
-                    ? "bg-secondary/40 text-foreground font-medium"
+                    ? "bg-secondary/50 text-foreground font-medium"
                     : "text-muted-foreground/60 font-normal",
               )}
             >
@@ -381,14 +380,14 @@ function BookAppointment() {
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-8" noValidate>
-        {/* STEP 1: Select Active Hospital */}
+        {/* STEP 1: Select Hospital Branch */}
         <section className="space-y-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2.5">
               <span className="grid h-7 w-7 place-items-center rounded-xl bg-primary text-xs font-bold text-primary-foreground shadow-subtle">
                 1
               </span>
-              <h2 className="text-lg font-bold tracking-tight text-foreground flex items-center gap-2">
+              <h2 className="font-display text-base sm:text-lg font-bold tracking-tight text-foreground flex items-center gap-2">
                 <Building2 className="h-5 w-5 text-primary" />
                 Select Hospital Branch
               </h2>
@@ -399,14 +398,14 @@ function BookAppointment() {
                 type="button"
                 variant="ghost"
                 size="sm"
-                className="text-xs text-muted-foreground hover:text-foreground"
+                className="text-xs text-muted-foreground hover:text-foreground tap-feedback"
                 onClick={() => {
                   setSelectedHospital(null);
                   setSelectedDoctor(null);
                   setSlot(null);
                 }}
               >
-                Change Hospital
+                Change Branch
               </Button>
             ) : null}
           </div>
@@ -425,7 +424,7 @@ function BookAppointment() {
           ) : (hospitalsQuery.data || []).length === 0 ? (
             <EmptyState
               title="No active hospital branches"
-              description="There are currently no active branches registered in the network."
+              description="There are currently no active hospital branches registered in the network."
             />
           ) : (
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
@@ -451,7 +450,7 @@ function BookAppointment() {
                     )}
                   >
                     <div className="flex items-start justify-between gap-2">
-                      <h3 className="font-bold text-base text-foreground leading-snug">{h.name}</h3>
+                      <h3 className="font-display font-bold text-base text-foreground leading-snug">{h.name}</h3>
                       {isSelected ? (
                         <span className="grid h-6 w-6 place-items-center rounded-full bg-primary text-primary-foreground shrink-0 shadow-subtle">
                           <CheckCircle2 className="h-4 w-4" />
@@ -480,7 +479,7 @@ function BookAppointment() {
                         {h.facilities.slice(0, 3).map((f) => (
                           <span
                             key={f}
-                            className="inline-block rounded-md bg-secondary/80 px-2 py-0.5 text-[10px] font-semibold text-secondary-foreground"
+                            className="inline-block rounded-md bg-secondary/80 px-2 py-0.5 text-[10px] font-medium text-secondary-foreground"
                           >
                             {f}
                           </span>
@@ -505,15 +504,15 @@ function BookAppointment() {
                 <span className="grid h-7 w-7 place-items-center rounded-xl bg-primary text-xs font-bold text-primary-foreground shadow-subtle">
                   2
                 </span>
-                <h2 className="text-lg font-bold tracking-tight text-foreground flex items-center gap-2">
+                <h2 className="font-display text-base sm:text-lg font-bold tracking-tight text-foreground flex items-center gap-2">
                   <Stethoscope className="h-5 w-5 text-primary" />
-                  Select Physician at {selectedHospital.name}
+                  Select Specialist Physician at {selectedHospital.name}
                 </h2>
               </div>
 
               {specializations.length > 1 ? (
                 <div className="flex items-center gap-2">
-                  <span className="text-xs font-medium text-muted-foreground">Department:</span>
+                  <span className="text-xs font-medium text-muted-foreground">Specialty:</span>
                   <select
                     value={specializationFilter}
                     onChange={(e) => setSpecializationFilter(e.target.value)}
@@ -533,7 +532,7 @@ function BookAppointment() {
             {doctorsQuery.isLoading ? (
               <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
                 {[1, 2].map((i) => (
-                  <Skeleton key={i} className="h-32 rounded-2xl" />
+                  <DoctorCardSkeleton key={i} />
                 ))}
               </div>
             ) : doctorsQuery.isError ? (
@@ -568,10 +567,10 @@ function BookAppointment() {
                     >
                       <div className="flex items-start justify-between gap-2">
                         <div>
-                          <h3 className="font-bold text-base text-foreground leading-snug">
+                          <h3 className="font-display font-bold text-base text-foreground leading-snug">
                             Dr. {doc.first_name} {doc.last_name}
                           </h3>
-                          <span className="inline-block rounded-md bg-primary/10 px-2 py-0.5 text-[11px] font-bold text-primary mt-1">
+                          <span className="inline-block rounded-md bg-primary/10 px-2 py-0.5 text-[11px] font-semibold text-primary mt-1">
                             {doc.specialization}
                           </span>
                         </div>
@@ -580,7 +579,7 @@ function BookAppointment() {
                             <CheckCircle2 className="h-4 w-4" />
                           </span>
                         ) : (
-                          <span className="grid h-7 w-7 place-items-center rounded-full bg-secondary/70 text-muted-foreground shrink-0">
+                          <span className="grid h-8 w-8 place-items-center rounded-full bg-secondary/70 text-muted-foreground shrink-0">
                             <User className="h-4 w-4" />
                           </span>
                         )}
@@ -635,11 +634,11 @@ function BookAppointment() {
                         className={cn(
                           "flex flex-col items-center justify-center rounded-xl p-2.5 text-center transition-all duration-150 border tap-feedback",
                           active
-                            ? "border-primary bg-primary text-primary-foreground shadow-soft ring-1 ring-primary"
-                            : "border-border bg-card text-foreground hover:bg-secondary/70",
+                            ? "border-primary bg-primary text-primary-foreground shadow-soft ring-1 ring-primary font-semibold"
+                            : "border-border bg-card text-foreground hover:bg-secondary/70 font-normal",
                         )}
                       >
-                        <span className="block text-[10px] font-bold uppercase tracking-wider opacity-80">
+                        <span className="block text-[10px] font-medium uppercase tracking-wider opacity-80">
                           {index === 0
                             ? "Today"
                             : day.toLocaleDateString(undefined, { weekday: "short" })}
@@ -675,12 +674,12 @@ function BookAppointment() {
                 ) : !availabilityQuery.data?.is_available ? (
                   <EmptyState
                     title="Clinician Off Duty"
-                    description={`Dr. ${selectedDoctor.first_name} is not available on ${availabilityQuery.data?.day_of_week || "this day"}. Please select another date.`}
+                    description={`Dr. ${selectedDoctor.first_name} is not on duty on ${availabilityQuery.data?.day_of_week || "this day"}. Please select another date.`}
                   />
                 ) : (availabilityQuery.data.available_slots || []).length === 0 ? (
                   <EmptyState
                     title="All Slots Booked"
-                    description="All appointment slots for this date are booked. Please pick another day."
+                    description="All consultation slots for this date are booked. Please select another date."
                   />
                 ) : (
                   <>
@@ -696,7 +695,7 @@ function BookAppointment() {
                               setErrors((prev) => ({ ...prev, slot: undefined }));
                             }}
                             className={cn(
-                              "rounded-xl px-3 py-2.5 text-xs font-bold transition-all duration-150 border tap-feedback",
+                              "rounded-xl px-3 py-2.5 text-xs font-semibold transition-all duration-150 border tap-feedback",
                               active
                                 ? "border-primary bg-primary text-primary-foreground shadow-soft ring-2 ring-primary"
                                 : "border-border bg-card text-foreground hover:bg-secondary/70",
@@ -735,9 +734,9 @@ function BookAppointment() {
                             type="button"
                             onClick={() => toggleSymptom(symptom)}
                             className={cn(
-                              "rounded-full px-3 py-1 text-xs font-semibold capitalize transition-all duration-150 border tap-feedback",
+                              "rounded-full px-3 py-1 text-xs font-medium capitalize transition-all duration-150 border tap-feedback",
                               active
-                                ? "border-primary bg-primary text-primary-foreground shadow-subtle"
+                                ? "border-primary bg-primary text-primary-foreground shadow-subtle font-semibold"
                                 : "border-border bg-card text-muted-foreground hover:bg-secondary hover:text-foreground",
                             )}
                           >
@@ -784,9 +783,9 @@ function BookAppointment() {
                 </div>
               </Panel>
 
-              {/* Real-time Booking Summary Box */}
+              {/* Real-time Booking Summary Card */}
               <div className="rounded-2xl border border-border/80 bg-surface/80 p-5 space-y-3.5 shadow-subtle">
-                <h4 className="text-xs font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
+                <h4 className="font-display text-xs font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
                   <Sparkles className="h-3.5 w-3.5 text-primary" />
                   Booking Review Summary
                 </h4>
