@@ -206,7 +206,7 @@ async def run_chat(
     if not api_key or api_key.startswith("your-"):
         raise RuntimeError("GEMINI_API_KEY is not configured.")
 
-    model_name: str = getattr(settings, "gemini_model", "gemini-flash-latest")
+    model_name: str = getattr(settings, "gemini_model", "gemini-3.6-flash")
     temperature: float = float(getattr(settings, "gemini_temperature", 0.2))
     max_output_tokens: int = int(getattr(settings, "gemini_max_output_tokens", 2048))
 

@@ -220,10 +220,10 @@ function AIMessage({ message }: { message: Message }) {
         className={cn(
           "max-w-[85%] rounded-2xl px-4 py-2.5 text-xs sm:text-sm shadow-subtle",
           isDoctor
-            ? "rounded-tr-sm bg-primary text-primary-foreground font-medium"
+            ? "rounded-tr-sm bg-primary text-primary-foreground font-medium selection:bg-black/30 selection:text-primary-foreground"
             : isError
-              ? "rounded-tl-sm bg-destructive/10 text-destructive border border-destructive/20"
-              : "rounded-tl-sm bg-surface/90 text-foreground border border-border/70",
+              ? "rounded-tl-sm bg-destructive/10 text-destructive border border-destructive/20 selection:bg-destructive/30"
+              : "rounded-tl-sm bg-surface/90 text-foreground border border-border/70 selection:bg-primary/25",
         )}
       >
         {isDoctor ? (

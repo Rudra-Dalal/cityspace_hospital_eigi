@@ -55,6 +55,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(null);
   }, []);
 
+  useEffect(() => {
+    const handleUnauthorized = () => {
+      logout();
+    };
+    window.addEventListener("citycare:unauthorized", handleUnauthorized);
+    return () => window.removeEventListener("citycare:unauthorized", handleUnauthorized);
+  }, [logout]);
+
   const value = useMemo<AuthState>(
     () => ({ user, token, ready, isAuthenticated: Boolean(token && user), login, logout }),
     [user, token, ready, login, logout],

@@ -49,7 +49,7 @@ export function AppShell({ children }: { children: ReactNode }) {
   }
 
   return (
-    <div className="min-h-screen text-foreground flex flex-col selection:bg-primary/20 selection:text-primary relative overflow-x-hidden">
+    <div className="min-h-screen text-foreground flex flex-col selection:bg-primary/25 relative overflow-x-hidden">
       {/* Interactive Ambient Gradient Background */}
       <InteractiveGradientBackground showGrid={true} />
 

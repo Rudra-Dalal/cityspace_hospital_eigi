@@ -78,7 +78,7 @@ class Settings(BaseSettings):
     # Gemini AI configuration — Doctor Assistant
     # -----------------------------------------------------------------------
     gemini_api_key: str = ""
-    gemini_model: str = "gemini-flash-latest"
+    gemini_model: str = "gemini-3.6-flash"
     gemini_enabled: bool = True
     gemini_timeout_seconds: int = 30
     gemini_max_output_tokens: int = 2048

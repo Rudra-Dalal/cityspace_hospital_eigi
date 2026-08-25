@@ -178,6 +178,9 @@ export async function apiFetch<T>(
   }
 
   if (!response.ok) {
+    if (response.status === 401 && auth && typeof window !== "undefined") {
+      window.dispatchEvent(new CustomEvent("citycare:unauthorized"));
+    }
     throw new ApiError(
       extractMessage(payload, `Request failed (${response.status})`),
       response.status,

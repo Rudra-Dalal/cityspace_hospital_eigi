@@ -152,6 +152,10 @@
     -webkit-tap-highlight-color: transparent;
   }
 
+  ::selection {
+    background-color: color-mix(in oklch, var(--primary) 30%, transparent);
+  }
+
   body {
     background-color: var(--color-background);
     color: var(--color-foreground);
