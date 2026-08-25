@@ -53,15 +53,16 @@ class TelegramPoller:
                     update_id = update.get("update_id")
                     if update_id:
                         self.offset = update_id + 1
-                    await self.router.process_update(update)
+                    asyncio.create_task(self.router.process_update(update))
 
             except asyncio.CancelledError:
                 break
             except Exception as exc:
                 logger.error("Unexpected error in Telegram polling loop: %s", exc, exc_info=True)
-                await asyncio.sleep(3)
+                await asyncio.sleep(1)
 
         logger.info("Poller loop ended.")
+        await TelegramAdapter.close_client()
         await close_mongo_connection()
 
     def stop(self) -> None:

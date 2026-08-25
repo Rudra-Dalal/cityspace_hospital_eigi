@@ -23,7 +23,9 @@ def escape_markdown(text: Optional[str]) -> str:
 
 
 class TelegramAdapter:
-    """Async HTTP client wrapper for Telegram Bot API."""
+    """Async HTTP client wrapper for Telegram Bot API with connection pooling."""
+
+    _shared_client: Optional[httpx.AsyncClient] = None
 
     def __init__(self, bot_token: Optional[str] = None):
         settings = get_settings()
@@ -31,28 +33,44 @@ class TelegramAdapter:
         self.base_url = f"https://api.telegram.org/bot{self.bot_token}"
         self.timeout = float(settings.telegram_request_timeout_seconds)
 
+    @classmethod
+    async def get_client(cls, timeout: float = 30.0) -> httpx.AsyncClient:
+        if cls._shared_client is None or cls._shared_client.is_closed:
+            limits = httpx.Limits(max_keepalive_connections=20, max_connections=50, keepalive_expiry=30.0)
+            cls._shared_client = httpx.AsyncClient(
+                timeout=httpx.Timeout(timeout, connect=5.0),
+                limits=limits,
+            )
+        return cls._shared_client
+
+    @classmethod
+    async def close_client(cls) -> None:
+        if cls._shared_client and not cls._shared_client.is_closed:
+            await cls._shared_client.aclose()
+            cls._shared_client = None
+
     async def _post(self, method: str, data: Optional[Dict[str, Any]] = None, files: Optional[Dict[str, Any]] = None, retries: int = 3) -> Dict[str, Any]:
-        """Perform an async HTTP POST request to Telegram API with exponential backoff."""
+        """Perform an async HTTP POST request to Telegram API with connection pooling."""
         url = f"{self.base_url}/{method}"
         last_exc: Optional[Exception] = None
+        client = await self.get_client(self.timeout)
 
         for attempt in range(1, retries + 1):
             try:
-                async with httpx.AsyncClient(timeout=self.timeout) as client:
-                    if files:
-                        resp = await client.post(url, data=data or {}, files=files)
-                    else:
-                        resp = await client.post(url, json=data or {})
+                if files:
+                    resp = await client.post(url, data=data or {}, files=files)
+                else:
+                    resp = await client.post(url, json=data or {})
 
-                    result = resp.json()
-                    if not result.get("ok"):
-                        logger.warning("Telegram API error on %s: %s", method, result.get("description"))
-                    return result
+                result = resp.json()
+                if not result.get("ok"):
+                    logger.warning("Telegram API error on %s: %s", method, result.get("description"))
+                return result
             except (httpx.RequestError, httpx.TimeoutException) as exc:
                 last_exc = exc
                 logger.warning("Telegram network attempt %s/%s failed on %s: %s", attempt, retries, method, exc)
                 if attempt < retries:
-                    await asyncio.sleep(0.5 * (2 ** (attempt - 1)))
+                    await asyncio.sleep(0.3 * (2 ** (attempt - 1)))
 
         logger.error("Telegram API call %s failed after %s retries: %s", method, retries, last_exc)
         return {"ok": False, "description": str(last_exc)}

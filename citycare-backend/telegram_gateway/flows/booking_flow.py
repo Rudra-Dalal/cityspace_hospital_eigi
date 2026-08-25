@@ -4,6 +4,7 @@ from datetime import date as date_cls, datetime, timezone, timedelta
 from typing import Any, Dict, List, Optional
 import zoneinfo
 
+from app.core.config import get_settings
 from app.cruds import user_crud
 from app.services.patient_discovery_service import (
     get_current_date_in_tz,
