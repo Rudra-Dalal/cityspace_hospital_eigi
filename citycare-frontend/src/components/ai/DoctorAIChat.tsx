@@ -331,8 +331,8 @@ export function DoctorAIChat() {
     userHasScrolledUp.current = false;
   };
 
-  const handleSend = useCallback(async () => {
-    const text = input.trim();
+  const handleSend = useCallback(async (overrideText?: string) => {
+    const text = (typeof overrideText === "string" ? overrideText : input).trim();
     if (!text || loading) return;
 
     const doctorMessage: Message = { id: uid(), role: "doctor", text };
@@ -379,18 +379,9 @@ export function DoctorAIChat() {
     }
   }, [input, loading, conversationId, scrollToBottom]);
 
-  const pendingSuggestionRef = useRef<string | null>(null);
   const handleSuggestionClick = (text: string) => {
-    pendingSuggestionRef.current = text;
-    setInput(text);
+    handleSend(text);
   };
-
-  useEffect(() => {
-    if (pendingSuggestionRef.current && input === pendingSuggestionRef.current) {
-      pendingSuggestionRef.current = null;
-      handleSend();
-    }
-  }, [input, handleSend]);
 
   return (
     <div className="surface-panel flex h-[560px] flex-col overflow-hidden shadow-subtle border-border/80">
