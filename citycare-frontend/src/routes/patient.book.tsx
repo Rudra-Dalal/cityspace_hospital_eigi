@@ -318,6 +318,48 @@ function BookAppointment() {
     );
   }
 
+  function handleStepClick(stepNum: number) {
+    if (stepNum === 1) {
+      document.getElementById("step-1")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    } else if (stepNum === 2) {
+      if (!selectedHospital) {
+        toast.info("Please select a hospital branch first in Step 1.");
+        document.getElementById("step-1")?.scrollIntoView({ behavior: "smooth", block: "start" });
+        return;
+      }
+      document.getElementById("step-2")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    } else if (stepNum === 3) {
+      if (!selectedHospital) {
+        toast.info("Please select a hospital branch first in Step 1.");
+        document.getElementById("step-1")?.scrollIntoView({ behavior: "smooth", block: "start" });
+        return;
+      }
+      if (!selectedDoctor) {
+        toast.info("Please select a specialist doctor first in Step 2.");
+        document.getElementById("step-2")?.scrollIntoView({ behavior: "smooth", block: "start" });
+        return;
+      }
+      document.getElementById("step-3")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    } else if (stepNum === 4) {
+      if (!selectedHospital) {
+        toast.info("Please select a hospital branch first in Step 1.");
+        document.getElementById("step-1")?.scrollIntoView({ behavior: "smooth", block: "start" });
+        return;
+      }
+      if (!selectedDoctor) {
+        toast.info("Please select a specialist doctor first in Step 2.");
+        document.getElementById("step-2")?.scrollIntoView({ behavior: "smooth", block: "start" });
+        return;
+      }
+      if (!slot) {
+        toast.info("Please select an available appointment time slot in Step 3.");
+        document.getElementById("step-3")?.scrollIntoView({ behavior: "smooth", block: "start" });
+        return;
+      }
+      document.getElementById("step-4")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+  }
+
   return (
     <div className="space-y-8 max-w-5xl mx-auto pb-16">
       <PageHeader
@@ -326,62 +368,78 @@ function BookAppointment() {
         description="Select a verified hospital branch, choose your specialist physician, and confirm a real-time appointment slot."
       />
 
-      {/* 4-Step Progress Indicator */}
-      <div className="rounded-2xl border border-border/70 bg-card p-3 sm:p-4 shadow-subtle">
-        <div className="grid grid-cols-4 gap-2 text-center">
+      {/* 4-Step Interactive Progress Stepper */}
+      <div className="rounded-2xl border border-border/80 bg-card/95 p-2 sm:p-2.5 shadow-subtle backdrop-blur-sm sticky top-4 z-20">
+        <div className="grid grid-cols-4 gap-1.5 sm:gap-2 text-center">
           {[
             {
               step: 1,
               label: "1. Branch",
               active: Boolean(selectedHospital),
               current: currentStep === 1,
+              subtitle: selectedHospital ? selectedHospital.name : "Select branch",
             },
             {
               step: 2,
               label: "2. Physician",
               active: Boolean(selectedDoctor),
               current: currentStep === 2,
+              subtitle: selectedDoctor ? `Dr. ${selectedDoctor.first_name}` : "Choose doctor",
             },
-            { step: 3, label: "3. Date & Slot", active: Boolean(slot), current: currentStep === 3 },
+            {
+              step: 3,
+              label: "3. Date & Slot",
+              active: Boolean(slot),
+              current: currentStep === 3,
+              subtitle: slot ? `${slot}` : "Choose time",
+            },
             {
               step: 4,
               label: "4. Details",
-              active: Boolean(slot && reason.length >= 10),
+              active: Boolean(slot && reason.trim().length >= 10),
               current: currentStep === 4,
+              subtitle: "Confirm visit",
             },
           ].map((item) => (
-            <div
+            <button
               key={item.step}
+              type="button"
+              onClick={() => handleStepClick(item.step)}
               className={cn(
-                "flex flex-col sm:flex-row items-center justify-center gap-1.5 rounded-xl py-2 px-2 transition-all",
+                "group flex flex-col items-center justify-center gap-1 rounded-xl py-2 px-1.5 sm:px-2.5 transition-all duration-200 tap-feedback cursor-pointer",
                 item.current
-                  ? "bg-primary/10 text-primary font-semibold ring-1 ring-primary/30"
+                  ? "bg-primary/10 text-primary font-semibold ring-1.5 ring-primary shadow-subtle"
                   : item.active
-                    ? "bg-secondary/50 text-foreground font-medium"
-                    : "text-muted-foreground/60 font-normal",
+                    ? "bg-secondary/60 text-foreground font-medium hover:bg-secondary hover:text-primary"
+                    : "text-muted-foreground/70 font-normal hover:bg-surface/80 hover:text-foreground",
               )}
             >
-              <span
-                className={cn(
-                  "grid h-5 w-5 place-items-center rounded-full text-[10px] font-bold",
-                  item.active
-                    ? "bg-primary text-primary-foreground"
-                    : item.current
-                      ? "bg-primary/20 text-primary"
-                      : "bg-muted text-muted-foreground",
-                )}
-              >
-                {item.active ? "✓" : item.step}
+              <div className="flex items-center gap-1.5">
+                <span
+                  className={cn(
+                    "grid h-5 w-5 place-items-center rounded-full text-[10px] font-bold shrink-0 transition-transform group-hover:scale-105",
+                    item.active
+                      ? "bg-primary text-primary-foreground shadow-subtle"
+                      : item.current
+                        ? "bg-primary text-primary-foreground"
+                        : "bg-muted text-muted-foreground",
+                  )}
+                >
+                  {item.active ? "✓" : item.step}
+                </span>
+                <span className="text-xs font-semibold truncate hidden sm:inline">{item.label}</span>
+              </div>
+              <span className="text-[11px] truncate max-w-full text-muted-foreground hidden md:block group-hover:text-foreground">
+                {item.subtitle}
               </span>
-              <span className="text-xs truncate">{item.label}</span>
-            </div>
+            </button>
           ))}
         </div>
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-8" noValidate>
         {/* STEP 1: Select Hospital Branch */}
-        <section className="space-y-4">
+        <section id="step-1" className="space-y-4 scroll-mt-24">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2.5">
               <span className="grid h-7 w-7 place-items-center rounded-xl bg-primary text-xs font-bold text-primary-foreground shadow-subtle">
@@ -440,6 +498,9 @@ function BookAppointment() {
                         setSelectedDoctor(null);
                         setSlot(null);
                         setErrors((prev) => ({ ...prev, hospital: undefined, doctor: undefined }));
+                        setTimeout(() => {
+                          document.getElementById("step-2")?.scrollIntoView({ behavior: "smooth", block: "start" });
+                        }, 100);
                       }
                     }}
                     className={cn(
@@ -496,9 +557,17 @@ function BookAppointment() {
           ) : null}
         </section>
 
+        {!selectedHospital ? (
+          <div className="rounded-2xl border border-dashed border-border/80 p-6 text-center text-muted-foreground bg-surface/30">
+            <p className="text-xs sm:text-sm font-medium">
+              💡 Select a hospital branch above to unlock Step 2: Specialist Physician selection.
+            </p>
+          </div>
+        ) : null}
+
         {/* STEP 2: Select Specialist Doctor */}
         {selectedHospital ? (
-          <section className="space-y-4 pt-2 fade-rise">
+          <section id="step-2" className="space-y-4 pt-2 fade-rise scroll-mt-24">
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 border-t border-border/60 pt-6">
               <div className="flex items-center gap-2.5">
                 <span className="grid h-7 w-7 place-items-center rounded-xl bg-primary text-xs font-bold text-primary-foreground shadow-subtle">
@@ -557,6 +626,9 @@ function BookAppointment() {
                         setSelectedDoctor(doc);
                         setSlot(null);
                         setErrors((prev) => ({ ...prev, doctor: undefined }));
+                        setTimeout(() => {
+                          document.getElementById("step-3")?.scrollIntoView({ behavior: "smooth", block: "start" });
+                        }, 100);
                       }}
                       className={cn(
                         "group relative rounded-2xl p-5 text-left transition-all duration-200 border tap-feedback",
@@ -609,9 +681,17 @@ function BookAppointment() {
           </section>
         ) : null}
 
+        {selectedHospital && !selectedDoctor ? (
+          <div className="rounded-2xl border border-dashed border-border/80 p-6 text-center text-muted-foreground bg-surface/30">
+            <p className="text-xs sm:text-sm font-medium">
+              💡 Select a specialist physician above to unlock Step 3: Date & Slot reservation.
+            </p>
+          </div>
+        ) : null}
+
         {/* STEP 3 & 4: Date, Live Slot Matrix & Consultation Form */}
         {selectedDoctor ? (
-          <div className="grid gap-6 lg:grid-cols-[1.1fr_0.9fr] pt-2 fade-rise">
+          <div id="step-3" className="grid gap-6 lg:grid-cols-[1.1fr_0.9fr] pt-2 fade-rise scroll-mt-24">
             <div className="space-y-6">
               {/* Date Selector */}
               <Panel
@@ -693,6 +773,9 @@ function BookAppointment() {
                             onClick={() => {
                               setSlot(value);
                               setErrors((prev) => ({ ...prev, slot: undefined }));
+                              setTimeout(() => {
+                                document.getElementById("step-4")?.scrollIntoView({ behavior: "smooth", block: "start" });
+                              }, 100);
                             }}
                             className={cn(
                               "rounded-xl px-3 py-2.5 text-xs font-semibold transition-all duration-150 border tap-feedback",
@@ -718,7 +801,7 @@ function BookAppointment() {
             </div>
 
             {/* Visit Details & Summary Form */}
-            <div className="space-y-6">
+            <div id="step-4" className="space-y-6 scroll-mt-24">
               <Panel title="4. Consultation Details">
                 <div className="space-y-4">
                   <div className="space-y-2">
