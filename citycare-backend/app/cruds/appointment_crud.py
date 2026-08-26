@@ -136,6 +136,13 @@ async def get_appointment_by_id(appointment_id: str) -> Optional[Dict[str, Any]]
     return await db.appointments.find_one({"_id": oid})
 
 
+async def get_patient_appointments(patient_id: str) -> List[Dict[str, Any]]:
+    """Retrieve all appointments for a given patient sorted by date descending."""
+    db = get_database()
+    cursor = db.appointments.find({"patient_id": patient_id}).sort("date", -1)
+    return [doc async for doc in cursor]
+
+
 async def cancel_appointment(appointment_id: str) -> Optional[Dict[str, Any]]:
     db = get_database()
     try:

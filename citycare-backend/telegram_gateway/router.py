@@ -36,6 +36,7 @@ from telegram_gateway.flows.registration_flow import (
     handle_registration_callback,
     handle_registration_text_message,
 )
+from telegram_gateway.assistant import ConversationalAssistant
 from telegram_gateway.identity_manager import IdentityManager
 from telegram_gateway.keyboards import main_menu_keyboard
 from telegram_gateway.models import TelegramFlowType, TelegramIdempotencyStatus
@@ -139,6 +140,7 @@ class TelegramRouter:
 
     def __init__(self, adapter: Optional[TelegramAdapter] = None):
         self.adapter = adapter or TelegramAdapter()
+        self.assistant = ConversationalAssistant(adapter=self.adapter)
 
     async def process_update(self, update: Dict[str, Any]) -> None:
         """Entry point for processing a single Telegram update dictionary."""
@@ -353,12 +355,14 @@ Please use /link to link your existing CityCare account or /register to create a
             if handled:
                 return
 
-        # 7. Fallback to AI Health & Policy Chat
-        await handle_ai_health_chat(
-            adapter=self.adapter,
+        # 7. Conversational Assistant (Natural understanding, Medihub services, AI health)
+        await self.assistant.handle_message(
             chat_id=chat_id,
+            user_id=user_id,
             text=text,
+            session=session,
             patient=patient,
+            from_user=from_user,
         )
 
     async def _handle_callback_query(self, callback_query: Dict[str, Any]) -> None:

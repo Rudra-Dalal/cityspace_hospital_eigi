@@ -126,3 +126,12 @@ class SessionManager:
             {"session_key": session_key},
             {"$set": {"patient_id": patient_id, "updated_at": now}},
         )
+
+    @staticmethod
+    async def get_session(session_key: str) -> Optional[TelegramSession]:
+        """Retrieve existing session by key without extending TTL."""
+        db = get_database()
+        doc = await db.telegram_sessions.find_one({"session_key": session_key})
+        if doc:
+            return TelegramSession(**doc)
+        return None

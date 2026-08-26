@@ -1,6 +1,7 @@
 """Verified patient prescriptions listing and secure PDF delivery."""
 
 from typing import Any, Dict, List, Optional
+import httpx
 from app.services.patient_prescription_service import (
     get_patient_prescriptions,
     get_prescription_details,
@@ -10,6 +11,7 @@ from telegram_gateway.keyboards import build_inline_keyboard, main_menu_keyboard
 from app.utils.logger import get_logger
 
 logger = get_logger(__name__)
+
 
 
 async def show_patient_prescriptions(
@@ -219,4 +221,148 @@ async def send_prescription_pdf(
         filename=filename,
         caption=caption,
     )
+
+
+async def show_latest_prescription_conversational(
+    adapter: TelegramAdapter,
+    chat_id: int,
+    patient: Optional[Dict[str, Any]],
+) -> None:
+    """Conversational presentation of latest prescription with diagnosis, medicines, instructions and PDF download."""
+    if not patient:
+        await adapter.send_message(
+            chat_id=chat_id,
+            text="🔒 To view your medical prescriptions, please link your CityCare account with /link or register with /register.",
+            reply_markup=main_menu_keyboard(is_verified=False),
+        )
+        return
+
+    patient_id = str(patient["_id"])
+    prescriptions = await get_patient_prescriptions(patient_id)
+    if not prescriptions:
+        await adapter.send_message(
+            chat_id=chat_id,
+            text="💊 *My Prescriptions*\n\nYou do not have any prescriptions on file yet\\.",
+            reply_markup=main_menu_keyboard(is_verified=True),
+        )
+        return
+
+    latest = prescriptions[0]
+    rx_id = latest.get("id")
+    d_name = escape_markdown(latest.get("doctor_name") or "Specialist Doctor")
+    diag = escape_markdown(latest.get("diagnosis") or "Medical Consultation")
+    created = escape_markdown(str(latest.get("created_at", ""))[:10])
+    inst = escape_markdown(latest.get("general_instructions") or "Follow prescription schedule as advised.")
+
+    med_lines = []
+    for m in latest.get("medicines", []):
+        m_name = escape_markdown(m.get("name", "Medication"))
+        dosage = escape_markdown(m.get("dosage", ""))
+        freq = escape_markdown(m.get("frequency", ""))
+        dur = escape_markdown(m.get("duration", ""))
+        minst = escape_markdown(m.get("instructions", ""))
+        parts = [p for p in [dosage, freq, f"for {dur}" if dur else "", f"({minst})" if minst else ""] if p]
+        details = " - ".join(parts) if parts else "As directed"
+        med_lines.append(f"• *{m_name}* - {details}")
+
+    meds_str = "\n".join(med_lines) if med_lines else "• _No specific medicines listed._"
+
+    msg = f"""Here is your latest prescription from *{d_name}*:
+
+*Diagnosis:*
+{diag}
+
+*Medicines:*
+{meds_str}
+
+*Instructions:*
+{inst}
+
+*Issued on:*
+{created}
+
+Would you like to view the full prescription?"""
+
+    buttons = []
+    if latest.get("pdf_url"):
+        buttons.append([{"text": "📥 Download Official PDF", "callback_data": f"rx:pdf:{rx_id}"}])
+    buttons.append([{"text": "📋 All Prescriptions", "callback_data": "nav:my_prescriptions"}])
+
+    await adapter.send_message(
+        chat_id=chat_id,
+        text=msg,
+        reply_markup=build_inline_keyboard(buttons),
+    )
+
+
+async def show_prescription_medicines_summary(
+    adapter: TelegramAdapter,
+    chat_id: int,
+    patient: Optional[Dict[str, Any]],
+) -> None:
+    """Concise medicine-focused summary for 'What medicines did my doctor prescribe?'."""
+    if not patient:
+        await adapter.send_message(
+            chat_id=chat_id,
+            text="🔒 To check your prescribed medicines, please link your CityCare account with /link or register with /register.",
+            reply_markup=main_menu_keyboard(is_verified=False),
+        )
+        return
+
+    patient_id = str(patient["_id"])
+    prescriptions = await get_patient_prescriptions(patient_id)
+    if not prescriptions:
+        await adapter.send_message(
+            chat_id=chat_id,
+            text="💊 *Prescribed Medicines*\n\nYou do not have any prescriptions on file yet\\.",
+            reply_markup=main_menu_keyboard(is_verified=True),
+        )
+        return
+
+    latest = prescriptions[0]
+    rx_id = latest.get("id")
+    d_name = escape_markdown(latest.get("doctor_name") or "Specialist Doctor")
+    created = escape_markdown(str(latest.get("created_at", ""))[:10])
+
+    meds = latest.get("medicines", [])
+    if not meds:
+        await adapter.send_message(
+            chat_id=chat_id,
+            text=f"💊 Your latest prescription from *{d_name}* on {created} does not list specific medications.",
+            reply_markup=main_menu_keyboard(is_verified=True),
+        )
+        return
+
+    med_lines = []
+    for m in meds:
+        m_name = escape_markdown(m.get("name", "Medication"))
+        dosage = escape_markdown(m.get("dosage", "Standard dose"))
+        freq = escape_markdown(m.get("frequency", "As advised"))
+        dur = escape_markdown(m.get("duration", ""))
+        minst = escape_markdown(m.get("instructions", ""))
+        line = f"• *{m_name}*\n  Dosage: {dosage}\n  Frequency: {freq}"
+        if dur:
+            line += f"\n  Duration: {dur}"
+        if minst:
+            line += f"\n  Instructions: {minst}"
+        med_lines.append(line)
+
+    meds_str = "\n\n".join(med_lines)
+    msg = f"""💊 *Prescribed Medicines \\(from {d_name}, {created}\\):*
+
+{meds_str}
+
+⚠️ _Please take all medications strictly according to doctor instructions\\. Consult your doctor before stopping or altering any dosage\\._"""
+
+    buttons = []
+    if latest.get("pdf_url"):
+        buttons.append([{"text": "📥 Download Official PDF", "callback_data": f"rx:pdf:{rx_id}"}])
+    buttons.append([{"text": "📋 All Prescriptions", "callback_data": "nav:my_prescriptions"}])
+
+    await adapter.send_message(
+        chat_id=chat_id,
+        text=msg,
+        reply_markup=build_inline_keyboard(buttons),
+    )
+
 

@@ -134,3 +134,34 @@ def consent_keyboard() -> Dict[str, Any]:
         ]
     ]
     return build_inline_keyboard(buttons)
+
+
+def registration_summary_keyboard() -> Dict[str, Any]:
+    """Confirmation keyboard before final patient creation."""
+    buttons = [
+        [
+            {"text": "✅ Confirm Registration", "callback_data": "reg:confirm"},
+            {"text": "✏️ Edit Details", "callback_data": "reg:edit"},
+        ],
+        [
+            {"text": "❌ Cancel", "callback_data": "reg:cancel"},
+        ],
+    ]
+    return build_inline_keyboard(buttons)
+
+
+def quick_departments_keyboard(specializations: Optional[List[str]] = None) -> Dict[str, Any]:
+    """Quick selection shortcuts for top clinical departments."""
+    specs = specializations or ["Cardiology", "Dermatology", "General Medicine", "Pediatrics", "Orthopedics"]
+    buttons = []
+    row = []
+    for s in specs:
+        row.append({"text": f"🩺 {s}", "callback_data": f"bk:spec:h:all:{s}"})
+        if len(row) == 2:
+            buttons.append(row)
+            row = []
+    if row:
+        buttons.append(row)
+    buttons.append([{"text": "👨‍⚕️ View All Doctors", "callback_data": "nav:doctors"}])
+    return build_inline_keyboard(buttons)
+
