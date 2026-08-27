@@ -115,7 +115,7 @@ async def _finalize_registration_flow(
     act_url = patient_record.get("activation_url")
     act_url_esc = escape_markdown(act_url) if act_url else ""
 
-    welcome_msg = f"""🎉 *Registration Successful!*
+    welcome_msg = f"""🎉 *Registration Successful\\!*
 
 Welcome to CityCare, *{p_name}*\\! Your Telegram account is now linked\\.
 
@@ -547,7 +547,7 @@ async def handle_registration_text_message(
         act_url = patient_record.get("activation_url")
         act_url_esc = escape_markdown(act_url) if act_url else ""
 
-        welcome_msg = f"""🎉 *Registration Successful!*
+        welcome_msg = f"""🎉 *Registration Successful\\!*
 
 Welcome to CityCare, *{p_name}*\\! Your Telegram account is now linked\\.
 

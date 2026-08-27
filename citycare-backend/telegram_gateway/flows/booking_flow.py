@@ -485,7 +485,7 @@ Would you like me to book this appointment?"""
                 appt_id = escape_markdown(res.get("id", ""))
                 d_name = escape_markdown(flow_data.get("doctor_name", "Specialist Doctor"))
                 h_name = escape_markdown(flow_data.get("hospital_name", "Central Clinic"))
-                confirm_text = f"""✅ *Appointment Confirmed!*
+                confirm_text = f"""✅ *Appointment Confirmed\\!*
 
 You're booked with *{d_name}* at *{h_name}* on *{escape_markdown(flow_data['date'])}* at *{escape_markdown(flow_data['slot'])}*\\. Your appointment has been confirmed\\.
 
@@ -820,7 +820,7 @@ async def handle_booking_callback(
         slot_esc = escape_markdown(appt.get("slot"))
         reason_esc = escape_markdown(appt.get("reason"))
 
-        confirmation_msg = f"""🎉 *Appointment Confirmed!*
+        confirmation_msg = f"""🎉 *Appointment Confirmed\\!*
 
 📋 *Reference ID:* `{appt_id}`
 🏥 *Hospital:* {h_name}

@@ -82,7 +82,7 @@ class TelegramAdapter:
         reply_markup: Optional[Dict[str, Any]] = None,
         parse_mode: Optional[str] = "Markdown",
     ) -> Dict[str, Any]:
-        """Send text message with optional inline keyboard."""
+        """Send text message with optional inline keyboard and fallback for parsing errors."""
         payload: Dict[str, Any] = {
             "chat_id": chat_id,
             "text": text,
@@ -91,7 +91,13 @@ class TelegramAdapter:
             payload["reply_markup"] = reply_markup
         if parse_mode:
             payload["parse_mode"] = parse_mode
-        return await self._post("sendMessage", data=payload)
+        res = await self._post("sendMessage", data=payload)
+        if not res.get("ok") and "can't parse entities" in (res.get("description") or "").lower() and parse_mode:
+            logger.warning("Retrying sendMessage without parse_mode due to entity parsing error: %s", res.get("description"))
+            fallback_payload = dict(payload)
+            fallback_payload.pop("parse_mode", None)
+            return await self._post("sendMessage", data=fallback_payload)
+        return res
 
     async def edit_message_text(
         self,
@@ -101,7 +107,7 @@ class TelegramAdapter:
         reply_markup: Optional[Dict[str, Any]] = None,
         parse_mode: Optional[str] = "Markdown",
     ) -> Dict[str, Any]:
-        """Edit an existing message text and keyboard."""
+        """Edit an existing message text and keyboard with fallback for parsing errors."""
         payload: Dict[str, Any] = {
             "chat_id": chat_id,
             "message_id": message_id,
@@ -111,7 +117,13 @@ class TelegramAdapter:
             payload["reply_markup"] = reply_markup
         if parse_mode:
             payload["parse_mode"] = parse_mode
-        return await self._post("editMessageText", data=payload)
+        res = await self._post("editMessageText", data=payload)
+        if not res.get("ok") and "can't parse entities" in (res.get("description") or "").lower() and parse_mode:
+            logger.warning("Retrying editMessageText without parse_mode due to entity parsing error: %s", res.get("description"))
+            fallback_payload = dict(payload)
+            fallback_payload.pop("parse_mode", None)
+            return await self._post("editMessageText", data=fallback_payload)
+        return res
 
     async def edit_message_reply_markup(
         self,

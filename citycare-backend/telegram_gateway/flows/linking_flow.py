@@ -202,7 +202,7 @@ async def handle_linking_text_message(
         await adapter.send_message(
             chat_id=chat_id,
             text=(
-                f"✅ *Account Linked Successfully!*\n\n"
+                f"✅ *Account Linked Successfully\\!*\n\n"
                 f"Welcome back, *{p_name}*\\! You can now book appointments, view your appointment schedule, and access prescriptions directly in Telegram\\."
             ),
             reply_markup=main_menu_keyboard(is_verified=True),

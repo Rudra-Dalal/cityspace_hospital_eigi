@@ -727,7 +727,7 @@ OUTPUT FORMAT:
         name = from_user.get("first_name", "there")
         if patient:
             p_name = escape_markdown(f"{patient.get('first_name', name)}")
-            msg = f"""👋 *Hello {p_name}, welcome back to CityCare!*
+            msg = f"""👋 *Hello {p_name}, welcome back to CityCare\\!*
 
 I am your personal hospital assistant\\. How can I help you today?
 
@@ -737,7 +737,7 @@ You can:
 • View your medical prescriptions and dosages
 • Inquire about hospital branches and facilities"""
         else:
-            msg = f"""👋 *Hello {escape_markdown(name)}, welcome to CityCare Hospital!*
+            msg = f"""👋 *Hello {escape_markdown(name)}, welcome to CityCare Hospital\\!*
 
 I am your hospital assistant\\. How can I help you today?
 
@@ -1281,7 +1281,7 @@ Would you like me to book this appointment?"""
             d_name = escape_markdown(flow_data.get("doctor_name", "Specialist Doctor"))
             h_name = escape_markdown(flow_data.get("hospital_name", "Central Clinic"))
 
-            confirm_text = f"""✅ *Appointment Confirmed!*
+            confirm_text = f"""✅ *Appointment Confirmed\\!*
 
 You're booked with *{d_name}* at *{h_name}* on *{escape_markdown(target_date)}* at *{escape_markdown(slot)}*\\. Your appointment has been confirmed\\.
 
@@ -1635,7 +1635,7 @@ Would you like me to create your patient profile?"""
         act_url = patient_record.get("activation_url", "")
         act_url_esc = escape_markdown(act_url) if act_url else ""
 
-        welcome = f"""🎉 *Registration Successful!*
+        welcome = f"""🎉 *Registration Successful\\!*
 
 Welcome to CityCare, *{p_name}*\\! Your Telegram account is now securely linked\\.
 
