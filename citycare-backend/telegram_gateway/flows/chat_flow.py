@@ -57,7 +57,6 @@ async def handle_ai_health_chat(
         await adapter.send_message(
             chat_id=chat_id,
             text=_EMERGENCY_ALERT,
-            reply_markup=main_menu_keyboard(is_verified=bool(patient)),
         )
         return
 

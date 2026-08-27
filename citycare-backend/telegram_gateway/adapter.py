@@ -113,6 +113,21 @@ class TelegramAdapter:
             payload["parse_mode"] = parse_mode
         return await self._post("editMessageText", data=payload)
 
+    async def edit_message_reply_markup(
+        self,
+        chat_id: Union[int, str],
+        message_id: int,
+        reply_markup: Optional[Dict[str, Any]] = None,
+    ) -> Dict[str, Any]:
+        """Edit or remove an existing message's inline keyboard."""
+        payload: Dict[str, Any] = {
+            "chat_id": chat_id,
+            "message_id": message_id,
+        }
+        if reply_markup is not None:
+            payload["reply_markup"] = reply_markup
+        return await self._post("editMessageReplyMarkup", data=payload)
+
     async def answer_callback_query(
         self,
         callback_query_id: str,
@@ -213,6 +228,12 @@ class FakeTelegramAdapter:
         }
         self.edited_messages.append(msg)
         return {"ok": True, "result": msg}
+
+    async def edit_message_reply_markup(self, chat_id, message_id, reply_markup=None):
+        for msg in self.sent_messages:
+            if msg.get("message_id") == message_id:
+                msg["reply_markup"] = reply_markup
+        return {"ok": True, "result": True}
 
     async def answer_callback_query(self, callback_query_id, text=None, show_alert=False):
         cb = {

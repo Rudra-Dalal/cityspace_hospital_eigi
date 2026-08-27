@@ -64,8 +64,17 @@ from telegram_gateway.keyboards import (
     slots_keyboard,
     confirmation_keyboard,
     main_menu_keyboard,
+    compact_menu_keyboard,
+    single_action_keyboard,
+    quick_shortcut_keyboard,
     registration_summary_keyboard,
     quick_departments_keyboard,
+)
+from telegram_gateway.conversation_policy import (
+    ConversationMode,
+    should_show_keyboard,
+    clear_stale_keyboard,
+    send_conversational_response,
 )
 from telegram_gateway.models import TelegramFlowType, TelegramSession
 from telegram_gateway.session_manager import SessionManager
@@ -122,11 +131,11 @@ def extract_registration_entities(text: str) -> Dict[str, str]:
 
     # 4. Name extraction
     name_match = re.search(
-        r"(?:my\s*name\s*is|i\s*am|name\s*(?:is|:)?)\s+([A-Za-z]{2,25}(?:\s+[A-Za-z]{2,25})+)",
+        r"(?:my\s*name\s*is|i\s*am|name\s*(?:is|:)?|register\s*(?:me\s*)?(?:as|:)?)\s+([A-Za-z]{2,25}(?:\s+[A-Za-z]{2,25})+)",
         clean_text,
         re.IGNORECASE,
     )
-    stop_words = {"and", "my", "is", "dob", "born", "date", "of", "birth", "email", "phone", "mobile", "the"}
+    stop_words = {"and", "my", "is", "dob", "born", "date", "of", "birth", "email", "phone", "mobile", "the", "register", "me"}
     if name_match:
         raw_name = name_match.group(1).strip()
         clean_parts = [p for p in raw_name.split() if p.lower() not in stop_words]
@@ -164,12 +173,12 @@ def parse_relative_date(date_text: str, tz_name: str = "Asia/Kolkata") -> Option
     lower = date_text.strip().lower()
     today = get_current_date_in_tz(tz_name)
 
-    if lower in ("today", "todays"):
-        return today.isoformat()
-    if lower in ("tomorrow", "tomorrows", "tmrw"):
-        return (today + timedelta(days=1)).isoformat()
-    if lower in ("day after tomorrow", "day after tmrw"):
+    if re.search(r"\b(day after tomorrow|day after tmrw)\b", lower):
         return (today + timedelta(days=2)).isoformat()
+    if re.search(r"\b(tomorrow|tomorrows|tmrw)\b", lower):
+        return (today + timedelta(days=1)).isoformat()
+    if re.search(r"\b(today|todays)\b", lower):
+        return today.isoformat()
 
     weekdays = ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"]
     for idx, w in enumerate(weekdays):
@@ -240,6 +249,141 @@ def parse_time_slot(time_text: str) -> Optional[str]:
     return f"{display_hour:02d}:{minute:02d} {display_meridiem}"
 
 
+def parse_time_preference(text: str) -> Optional[str]:
+    """Extract general time of day preference (morning, afternoon, evening)."""
+    lower = text.strip().lower()
+    if re.search(r"\b(morning|am)\b", lower):
+        return "morning"
+    if re.search(r"\b(afternoon)\b", lower):
+        return "afternoon"
+    if re.search(r"\b(evening|night)\b", lower):
+        return "evening"
+    return None
+
+
+def resolve_doctor_reference(
+    query: str,
+    presented_doctors: List[Dict[str, Any]],
+) -> Optional[Dict[str, Any]]:
+    """
+    Resolve ordinal or contextual doctor reference from presented doctors list.
+    Examples:
+      - 'the first one', 'first doctor', '1st one', 'first', 'earlier one', 'that doctor' -> presented_doctors[0]
+      - 'the second doctor', 'second one', '2nd one', 'second' -> presented_doctors[1]
+      - 'the third doctor', 'third one', '3rd one', 'third' -> presented_doctors[2]
+      - 'the last doctor', 'last one', 'the last one' -> presented_doctors[-1]
+      - 'Sharma', 'Dr Sharma', 'Dr. Sharma', 'Mehta' -> matching doctor by surname or name
+    """
+    if not presented_doctors:
+        return None
+
+    clean = query.strip().lower()
+
+    # 1. Check ordinal references
+    if re.search(r"\b(first|1st|earlier|earliest)\b", clean):
+        return presented_doctors[0]
+    if re.search(r"\b(second|2nd)\b", clean) and len(presented_doctors) > 1:
+        return presented_doctors[1]
+    if re.search(r"\b(third|3rd)\b", clean) and len(presented_doctors) > 2:
+        return presented_doctors[2]
+    if re.search(r"\b(fourth|4th)\b", clean) and len(presented_doctors) > 3:
+        return presented_doctors[3]
+    if re.search(r"\b(last|latest)\b", clean):
+        return presented_doctors[-1]
+    if re.search(r"\b(that doctor|that one|this one)\b", clean) and len(presented_doctors) == 1:
+        return presented_doctors[0]
+
+    # 2. Check surname / name matches against presented doctors
+    for doc in presented_doctors:
+        first = (doc.get("first_name") or "").lower()
+        last = (doc.get("last_name") or "").lower()
+        doc_name = (doc.get("name") or "").lower()
+
+        if last and last in clean:
+            return doc
+        if first and len(first) > 2 and first in clean:
+            return doc
+        if doc_name and doc_name in clean:
+            return doc
+
+    return None
+
+
+def resolve_slot_reference(
+    query: str,
+    presented_slots: List[str],
+) -> Optional[str]:
+    """
+    Resolve ordinal, time-of-day, or partial time reference from presented slots.
+    Examples:
+      - 'the first slot', 'the first one', 'first slot', 'first', 'earliest', 'earliest slot' -> presented_slots[0]
+      - 'the second slot', 'second', '2nd slot' -> presented_slots[1]
+      - 'the third slot', 'third', '3rd slot' -> presented_slots[2]
+      - 'the last slot', 'last', 'latest' -> presented_slots[-1]
+      - 'morning', 'the morning slot' -> first slot with 'AM'
+      - 'afternoon' -> first slot with 'PM' before 17:00
+      - 'evening' -> first slot after 17:00
+      - '10:30', '10:30 AM', '11' -> matching slot string
+    """
+    if not presented_slots:
+        return None
+
+    clean = query.strip().lower()
+
+    # 1. Check ordinal references
+    if re.search(r"\b(first|1st|earliest)\b", clean):
+        return presented_slots[0]
+    if re.search(r"\b(second|2nd)\b", clean) and len(presented_slots) > 1:
+        return presented_slots[1]
+    if re.search(r"\b(third|3rd)\b", clean) and len(presented_slots) > 2:
+        return presented_slots[2]
+    if re.search(r"\b(fourth|4th)\b", clean) and len(presented_slots) > 3:
+        return presented_slots[3]
+    if re.search(r"\b(last|latest)\b", clean):
+        return presented_slots[-1]
+
+    # 2. Check time of day preferences
+    if re.search(r"\b(morning|am)\b", clean):
+        morning_slots = [s for s in presented_slots if "am" in s.lower() or int(s.split(":")[0]) < 12]
+        if morning_slots:
+            return morning_slots[0]
+
+    if re.search(r"\b(afternoon)\b", clean):
+        afternoon_slots = [
+            s for s in presented_slots
+            if "pm" in s.lower() and (int(s.split(":")[0]) == 12 or int(s.split(":")[0]) < 5)
+        ]
+        if afternoon_slots:
+            return afternoon_slots[0]
+
+    if re.search(r"\b(evening)\b", clean):
+        evening_slots = [
+            s for s in presented_slots
+            if "pm" in s.lower() and (int(s.split(":")[0]) >= 5 and int(s.split(":")[0]) != 12)
+        ]
+        if evening_slots:
+            return evening_slots[0]
+
+    # 3. Direct or normalized time match
+    clean_time = clean.replace(" ", "").replace(".", "")
+    for slot in presented_slots:
+        norm_slot = slot.lower().replace(" ", "").replace(".", "")
+        if clean_time in norm_slot or norm_slot in clean_time:
+            return slot
+        time_part = slot.split()[0].lower()
+        if time_part == clean or clean.startswith(time_part):
+            return slot
+
+    # 4. Try parse_time_slot
+    parsed = parse_time_slot(query)
+    if parsed:
+        for slot in presented_slots:
+            if slot.lower().replace(" ", "") == parsed.lower().replace(" ", ""):
+                return slot
+
+    return None
+
+
 class ConversationalAssistant:
     """Master conversational Hermes Agent for CityCare Hospital Telegram Assistant."""
 
@@ -260,12 +404,14 @@ class ConversationalAssistant:
         if not query:
             return
 
+        # Clear stale inline keyboard from prior turns
+        await clear_stale_keyboard(self.adapter, chat_id, session)
+
         # 1. Critical Emergency Check
         if _detect_emergency(query):
             await self.adapter.send_message(
                 chat_id=chat_id,
                 text=_EMERGENCY_ALERT,
-                reply_markup=main_menu_keyboard(is_verified=bool(patient)),
             )
             return
 
@@ -281,13 +427,20 @@ class ConversationalAssistant:
             await SessionManager.clear_flow(session.session_key)
             await self.adapter.send_message(
                 chat_id=chat_id,
-                text="🔄 *Workflow Reset*\n\nNo problem! I have cleared your active request\\. How can CityCare assist you today?",
-                reply_markup=main_menu_keyboard(is_verified=bool(patient)),
+                text="No problem\\. I've cancelled that request\\. What would you like to do instead?",
             )
             return
 
         if intent == "change_mind_or_switch":
             await self._handle_context_switch(chat_id, session, patient, query, entities)
+            return
+
+        if intent == "symptom_intake_request":
+            await self._handle_symptom_intake(chat_id, session, patient)
+            return
+
+        if intent == "ask_doctor_preference":
+            await self._handle_ask_doctor_preference(chat_id, session)
             return
 
         # 4. Active Workflow Dispatches
@@ -304,7 +457,7 @@ class ConversationalAssistant:
             return
 
         if intent == "view_appointments":
-            await self._handle_view_appointments(chat_id, patient)
+            await self._handle_view_appointments(chat_id, patient, session=session)
             return
 
         if intent == "cancel_appointment":
@@ -316,11 +469,11 @@ class ConversationalAssistant:
             return
 
         if intent == "help":
-            await self._handle_help(chat_id, patient)
+            await self._handle_help(chat_id, patient, session=session)
             return
 
         if intent == "greeting":
-            await self._handle_greeting(chat_id, patient, from_user)
+            await self._handle_greeting(chat_id, patient, from_user, session=session)
             return
 
         if intent == "symptom_discussion":
@@ -363,7 +516,9 @@ PATIENT AUTHENTICATED: {bool(patient)}
 
 POSSIBLE INTENTS:
 - "greeting": user says hi, hello, good morning
+- "symptom_intake_request": user asks to describe or explain symptoms first (e.g. "can I tell you my symptoms first?")
 - "symptom_discussion": user describes a symptom or health concern (e.g. skin rash, tooth pain, headache)
+- "ask_doctor_preference": user wants a doctor generally without specifics (e.g. "I need a doctor", "find me a doctor")
 - "find_doctor": user wants to find, see, or list doctors or specialists
 - "check_availability": user asks for doctor or department availability on a day
 - "book_appointment": user wants to book, schedule, or reserve an appointment slot
@@ -373,9 +528,9 @@ POSSIBLE INTENTS:
 - "view_medicines": user asks specifically what medicines or medications were prescribed
 - "hospital_info": user asks about hospital branches, facilities, hours, services, location
 - "register_patient": user asks to register or sign up as a patient
-- "change_mind_or_switch": user says "actually I want a different doctor", "change doctor", "let's change date"
-- "cancel_flow": user says "I changed my mind", "cancel that", "forget it", "start over"
-- "confirm_action": user says "yes", "confirm", "proceed", "looks good", "correct"
+- "change_mind_or_switch": user says "actually I want a different doctor", "change doctor", "let's change date", "actually Friday"
+- "cancel_flow": user says "I changed my mind", "cancel that", "forget it", "never mind", "start over"
+- "confirm_action": user says "yes", "confirm", "proceed", "looks good", "correct", "book it"
 - "help": user asks for help or commands
 - "general_chat": any other clinic query
 
@@ -418,14 +573,25 @@ OUTPUT FORMAT:
         entities: Dict[str, Any] = {}
 
         # Check for cancel or change of mind
-        if re.search(r"\b(changed my mind|forget (it|that)|nevermind|start over|cancel that)\b", lower):
+        if re.search(r"\b(changed my mind|forget (it|that)|nevermind|never mind|start over|cancel that)\b", lower):
             return {"intent": "cancel_flow", "entities": {}}
 
-        if re.search(r"\b(different doctor|another doctor|change doctor|switch doctor|different specialist)\b", lower):
+        if re.search(r"\b(different doctor|another doctor|change doctor|switch doctor|different specialist|someone else|actually,? someone else)\b", lower):
             return {"intent": "change_mind_or_switch", "entities": {"switch": "doctor"}}
+
+        if re.search(r"\b(change\s*(?:the\s*)?date|different\s*date|another\s*date|actually\s+(?:monday|tuesday|wednesday|thursday|friday|saturday|sunday|tomorrow|today))\b", lower):
+            return {"intent": "change_mind_or_switch", "entities": {"switch": "date"}}
 
         if re.search(r"^\b(cancel|reset|stop)\b$", lower):
             return {"intent": "cancel_flow", "entities": {}}
+
+        # Symptom Intake Request (User asks to describe symptoms before choosing doctor)
+        if (
+            re.search(r"\b(can i|may i|i want to|let me|should i|could i)\b.*\b(symptom|symptoms|explain|describe|what'?s wrong|feeling)\b", lower)
+            or re.search(r"\b(tell|explain|describe|share)\b.*\b(symptom|symptoms|what'?s wrong|how i feel|what i am feeling)\b", lower)
+            or re.search(r"\bsymptoms?\s+first\b", lower)
+        ):
+            return {"intent": "symptom_intake_request", "entities": {}}
 
         # Help
         if re.search(r"^\b(help|guide|instructions)\b", lower):
@@ -460,15 +626,7 @@ OUTPUT FORMAT:
             elif re.search(r"\b(register|sign\s*up|new\s*patient|create\s*profile|create\s*account)\b", lower):
                 return {"intent": "register_patient", "entities": {}}
 
-        # Confirmation
-        if re.search(r"^\b(yes|confirm|proceed|looks good|correct|agree|i agree|book it|sure)\b", lower):
-            return {"intent": "confirm_action", "entities": {}}
-
-        # Hospital Facilities
-        if re.search(r"\b(facilities|facility|branches?|hospital\s*info|location|locations?|address)\b", lower):
-            return {"intent": "hospital_info", "entities": {}}
-
-        # Extract Date & Slot
+        # Extract Date & Slot & Time preference
         parsed_date = parse_relative_date(text)
         if parsed_date:
             entities["date"] = parsed_date
@@ -476,6 +634,21 @@ OUTPUT FORMAT:
         parsed_slot = parse_time_slot(text)
         if parsed_slot:
             entities["slot"] = parsed_slot
+
+        time_pref = parse_time_preference(text)
+        if time_pref:
+            entities["time_preference"] = time_pref
+
+        # Confirmation (only if NOT containing date/slot specifications or if in confirm_booking step)
+        has_date_spec = bool(parsed_date)
+        has_slot_spec = bool(parsed_slot)
+        if session.flow_step == "confirm_booking" or (not has_date_spec and not has_slot_spec):
+            if re.search(r"^\b(yes|confirm|proceed|looks good|correct|agree|i agree|book it|sure|go ahead|book)\b", lower):
+                return {"intent": "confirm_action", "entities": {}}
+
+        # Hospital Facilities
+        if re.search(r"\b(facilities|facility|branches?|hospital\s*info|location|locations?|address)\b", lower):
+            return {"intent": "hospital_info", "entities": {}}
 
         # Extract Doctor Name (e.g. "Dr. Sharma", "Dr Sharma", "Sharma", "Mehta")
         doc_match = re.search(r"(?:dr\.?|doctor)\s+([A-Za-z]+(?:\s+[A-Za-z]+)?)", text, re.IGNORECASE)
@@ -490,16 +663,43 @@ OUTPUT FORMAT:
         for pattern, spec in SYMPTOM_SPECIALIZATION_MAP:
             if re.search(pattern, lower):
                 entities["specialization"] = spec
-                entities["symptoms"] = text
+                # Only treat as symptoms if not a search query like "find dermatologists"
+                is_search_query = bool(re.search(r"\b(find|show|list|available|doctors?|specialists?|who are|which)\b", lower))
+                if not is_search_query:
+                    entities["symptoms"] = text
                 break
 
-        # Booking intent indicators
-        if re.search(r"\b(book|appointment|schedule|see\s*a\s*doctor|visit\s*a\s*doctor|consultation)\b", lower):
-            return {"intent": "book_appointment", "entities": entities}
+        # Check for Open-Ended Doctor Request (e.g. "I need a doctor", "I want to see a doctor", "find me a doctor")
+        # When NO doctor name, NO specialization, NO symptoms, and NO date were detected
+        if (
+            re.search(r"^\b(i\s*need\s*a\s*doctor|i\s*want\s*a\s*doctor|find\s*me\s*a\s*doctor|i\s*need\s*medical\s*help|need\s*a\s*doctor|want\s*a\s*doctor|see\s*a\s*doctor)\b", lower)
+            and not entities.get("doctor_name")
+            and not entities.get("specialization")
+            and not entities.get("symptoms")
+            and not entities.get("date")
+        ):
+            return {"intent": "ask_doctor_preference", "entities": {}}
+
+        # If user is awaiting symptoms description, treat input as symptoms
+        if session.flow_data.get("awaiting_symptoms"):
+            entities["symptoms"] = text
+            if not entities.get("specialization"):
+                entities["specialization"] = "General Physician"
+            return {"intent": "symptom_discussion", "entities": entities}
 
         # Symptom discussion
         if "symptoms" in entities and not ("book" in lower or "appointment" in lower):
             return {"intent": "symptom_discussion", "entities": entities}
+
+        # Booking intent indicators
+        if re.search(r"\b(book|appointment|schedule|consultation)\b", lower):
+            return {"intent": "book_appointment", "entities": entities}
+
+        # If date or slot or doctor provided and session already has specialization or active booking
+        if entities.get("date") and (session.flow_data.get("specialization") or session.flow_data.get("doctor_id") or session.flow_step in ("symptom_followup", "select_doctor", "select_date")):
+            if not entities.get("specialization") and session.flow_data.get("specialization"):
+                entities["specialization"] = session.flow_data.get("specialization")
+            return {"intent": "find_doctor", "entities": entities}
 
         # Find doctor
         if (
@@ -511,7 +711,7 @@ OUTPUT FORMAT:
 
         # In-flight booking flow checks
         if session.current_flow == TelegramFlowType.BOOKING.value:
-            if parsed_slot or parsed_date or entities.get("doctor_name"):
+            if parsed_slot or parsed_date or entities.get("doctor_name") or entities.get("time_preference"):
                 return {"intent": "book_appointment", "entities": entities}
 
         return {"intent": "general_chat", "entities": entities}
@@ -521,6 +721,7 @@ OUTPUT FORMAT:
         chat_id: int,
         patient: Optional[Dict[str, Any]],
         from_user: Dict[str, Any],
+        session: Optional[TelegramSession] = None,
     ) -> None:
         """Friendly natural greeting acknowledging patient status."""
         name = from_user.get("first_name", "there")
@@ -546,10 +747,50 @@ You can:
 • Book an appointment or register as a patient
 • Explore our clinic locations and facilities"""
 
-        await self.adapter.send_message(
+        await send_conversational_response(
+            adapter=self.adapter,
             chat_id=chat_id,
             text=msg,
-            reply_markup=main_menu_keyboard(is_verified=bool(patient)),
+            session=session,
+            reply_markup=compact_menu_keyboard(is_verified=bool(patient)),
+        )
+
+    async def _handle_symptom_intake(
+        self,
+        chat_id: int,
+        session: TelegramSession,
+        patient: Optional[Dict[str, Any]],
+    ) -> None:
+        """Invites patient to describe symptoms in natural words without buttons."""
+        flow_data = dict(session.flow_data or {})
+        flow_data["awaiting_symptoms"] = True
+        await SessionManager.update_flow(
+            session_key=session.session_key,
+            current_flow=TelegramFlowType.BOOKING.value,
+            flow_step="awaiting_symptoms",
+            flow_data=flow_data,
+        )
+        await self.adapter.send_message(
+            chat_id=chat_id,
+            text="Absolutely\\. Tell me what's been bothering you\\. You can describe your symptoms in your own words, and I'll help you find an appropriate department or specialist\\.",
+        )
+
+    async def _handle_ask_doctor_preference(
+        self,
+        chat_id: int,
+        session: TelegramSession,
+    ) -> None:
+        """Conversational clarification for open-ended 'I need a doctor'."""
+        flow_data = dict(session.flow_data or {})
+        await SessionManager.update_flow(
+            session_key=session.session_key,
+            current_flow=TelegramFlowType.BOOKING.value,
+            flow_step="awaiting_doctor_or_symptoms",
+            flow_data=flow_data,
+        )
+        await self.adapter.send_message(
+            chat_id=chat_id,
+            text="Of course\\. What would you like help with? You can describe what's bothering you, or tell me if you already have a specialist or doctor in mind\\.",
         )
 
     async def _handle_symptom_discussion(
@@ -561,36 +802,36 @@ You can:
         entities: Dict[str, Any],
     ) -> None:
         """Symptom exploration: empathize, safety guidance, map to department without diagnosing."""
-        spec = entities.get("specialization", "General Physician")
+        spec = entities.get("specialization") or session.flow_data.get("specialization") or "General Physician"
 
         # Update conversation state with specialization
         flow_data = dict(session.flow_data or {})
         flow_data["specialization"] = spec
         flow_data["symptoms"] = query
+        flow_data.pop("awaiting_symptoms", None)
         await SessionManager.update_flow(
             session_key=session.session_key,
             current_flow=TelegramFlowType.BOOKING.value,
-            flow_step="select_date",
+            flow_step="symptom_followup",
             flow_data=flow_data,
         )
 
         spec_esc = escape_markdown(spec)
-        reply = f"""Thank you for sharing\\. While I cannot provide a medical diagnosis, based on what you described, a consultation with our *{spec_esc}* department may be appropriate\\.
+        spec_plural = escape_markdown(f"{spec.lower()} specialists" if not spec.endswith("s") else f"{spec.lower()} doctors")
 
-I can check which {spec_esc} doctors are available at CityCare\\. Which day would you prefer? \\(e\\.g\\. *today*, *tomorrow*, or a specific date\\)"""
+        reply = (
+            f"Thanks for explaining that\\. Based on what you've described, *{spec_esc}* may be a relevant department to explore\\. "
+            "I can't diagnose the condition, but I can help you find an appropriate specialist\\.\n\n"
+            f"Would you like me to check available {spec_plural}?"
+        )
 
-        # Generate date suggestions
-        today = get_current_date_in_tz()
-        dates = [
-            {"date": today.isoformat(), "label": f"Today ({today.strftime('%a')})"},
-            {"date": (today + timedelta(days=1)).isoformat(), "label": f"Tomorrow ({(today + timedelta(days=1)).strftime('%a')})"},
-            {"date": (today + timedelta(days=2)).isoformat(), "label": (today + timedelta(days=2)).strftime('%a, %b %d')},
-        ]
-
-        await self.adapter.send_message(
+        # Send conversational response with optional single action button
+        await send_conversational_response(
+            adapter=self.adapter,
             chat_id=chat_id,
             text=reply,
-            reply_markup=dates_keyboard(dates),
+            session=session,
+            reply_markup=single_action_keyboard(f"🔍 Find a {spec}", f"nav:spec:{spec}"),
         )
 
     async def _handle_doctor_discovery(
@@ -605,13 +846,13 @@ I can check which {spec_esc} doctors are available at CityCare\\. Which day woul
         spec = entities.get("specialization") or session.flow_data.get("specialization")
         doc_query = entities.get("doctor_name")
         target_date = entities.get("date") or session.flow_data.get("date")
+        time_pref = entities.get("time_preference") or session.flow_data.get("time_preference")
 
-        # 1. If no spec and no doctor mentioned: Ask intelligent follow-up
-        if not spec and not doc_query:
+        # 1. If no spec, no doctor, and no date: Ask intelligent follow-up without keyboard
+        if not spec and not doc_query and not target_date:
             await self.adapter.send_message(
                 chat_id=chat_id,
-                text="Of course\\! Do you already have a doctor in mind, or would you like me to recommend a specialist based on your health problem or symptoms?",
-                reply_markup=quick_departments_keyboard(),
+                text="Of course\\. What would you like help with? You can describe what's bothering you, or tell me if you already have a specialist or doctor in mind\\.",
             )
             return
 
@@ -638,7 +879,6 @@ I can check which {spec_esc} doctors are available at CityCare\\. Which day woul
             await self.adapter.send_message(
                 chat_id=chat_id,
                 text=f"I couldn't find active specialists{spec_str}\\. Would you like to view our departments or explore other hospital branches?",
-                reply_markup=quick_departments_keyboard(),
             )
             return
 
@@ -660,25 +900,31 @@ I can check which {spec_esc} doctors are available at CityCare\\. Which day woul
                 await self.adapter.send_message(
                     chat_id=chat_id,
                     text=f"None of our *{spec_esc}* doctors have open slots on *{date_esc}*\\. Would you like to check another date?",
-                    reply_markup=main_menu_keyboard(is_verified=bool(patient)),
                 )
                 return
 
-            lines = [f"I found *{len(available_doctors)}* {spec_esc} doctor\\(s\\) available on *{date_esc}*:\n"]
-            for d in available_doctors:
-                name = escape_markdown(f"Dr. {d.get('first_name')} {d.get('last_name')}")
-                hosp = escape_markdown(d.get("hospital_name") or "Central Branch")
-                slots_count = len(d.get("available_slots", []))
-                first_slots = ", ".join(d.get("available_slots", [])[:3])
-                lines.append(f"• *{name}* \\({hosp}\\)\n  ⏰ {slots_count} slots open \\(e\\.g\\. {escape_markdown(first_slots)}\\)")
-
-            lines.append("\nWhich doctor would you like to see?")
-
-            # Save state
+            # Save state including presented_doctors
             flow_data = dict(session.flow_data or {})
             if spec:
                 flow_data["specialization"] = spec
             flow_data["date"] = target_date
+            if time_pref:
+                flow_data["time_preference"] = time_pref
+
+            flow_data["presented_doctors"] = [
+                {
+                    "id": d["id"],
+                    "name": f"Dr. {d.get('first_name')} {d.get('last_name')}",
+                    "first_name": d.get("first_name"),
+                    "last_name": d.get("last_name"),
+                    "specialization": d.get("specialization"),
+                    "hospital_id": d.get("hospital_id"),
+                    "hospital_name": d.get("hospital_name") or "Central Branch",
+                    "available_slots": d.get("available_slots", []),
+                }
+                for d in available_doctors[:6]
+            ]
+
             await SessionManager.update_flow(
                 session_key=session.session_key,
                 current_flow=TelegramFlowType.BOOKING.value,
@@ -686,29 +932,61 @@ I can check which {spec_esc} doctors are available at CityCare\\. Which day woul
                 flow_data=flow_data,
             )
 
-            await self.adapter.send_message(
+            lines = [f"I found a few *{spec_esc}* doctors who may work for you on *{date_esc}*:\n"]
+            for idx, d in enumerate(available_doctors[:6], 1):
+                name = escape_markdown(f"Dr. {d.get('first_name')} {d.get('last_name')}")
+                hosp = escape_markdown(d.get("hospital_name") or "Central Branch")
+                slots_list = d.get("available_slots", [])
+                if time_pref == "morning":
+                    m_slots = [s for s in slots_list if "am" in s.lower() or int(s.split(":")[0]) < 12]
+                    display_slots = m_slots[:3] if m_slots else slots_list[:3]
+                elif time_pref in ("afternoon", "evening"):
+                    p_slots = [s for s in slots_list if "pm" in s.lower()]
+                    display_slots = p_slots[:3] if p_slots else slots_list[:3]
+                else:
+                    display_slots = slots_list[:3]
+                slots_str = escape_markdown(", ".join(display_slots)) if display_slots else "Available"
+                lines.append(f"{idx}\\. *{name}*\n   🏥 {hosp}\n   ⏰ {slots_str}\n")
+
+            lines.append("Which doctor would you prefer?")
+
+            await send_conversational_response(
+                adapter=self.adapter,
                 chat_id=chat_id,
                 text="\n".join(lines),
-                reply_markup=doctors_keyboard(available_doctors),
+                session=session,
+                reply_markup=doctors_keyboard(available_doctors[:6]),
             )
             return
 
         # 4. No specific date: list matching doctors with general working days
         spec_label = f" *{escape_markdown(spec)}*" if spec else ""
         lines = [f"Here are the available{spec_label} specialists at CityCare:\n"]
-        for d in doctors[:6]:
+        for idx, d in enumerate(doctors[:6], 1):
             name = escape_markdown(f"Dr. {d.get('first_name')} {d.get('last_name')}")
             hosp = escape_markdown(d.get("hospital_name") or "Central Branch")
             qual = escape_markdown(d.get("qualification", "MD"))
             days = ", ".join(d.get("available_days", [])[:3])
-            lines.append(f"• *{name}* — {qual}\n  🏥 {hosp} | 📅 Days: {escape_markdown(days)}")
+            lines.append(f"{idx}\\. *{name}* — {qual}\n   🏥 {hosp} | 📅 Days: {escape_markdown(days)}")
 
         lines.append("\nWhich doctor or day would you prefer?")
 
-        # Save specialization in state
+        # Save specialization and presented_doctors in state
         flow_data = dict(session.flow_data or {})
         if spec:
             flow_data["specialization"] = spec
+        flow_data["presented_doctors"] = [
+            {
+                "id": d["id"],
+                "name": f"Dr. {d.get('first_name')} {d.get('last_name')}",
+                "first_name": d.get("first_name"),
+                "last_name": d.get("last_name"),
+                "specialization": d.get("specialization"),
+                "hospital_id": d.get("hospital_id"),
+                "hospital_name": d.get("hospital_name") or "Central Branch",
+            }
+            for d in doctors[:6]
+        ]
         await SessionManager.update_flow(
             session_key=session.session_key,
             current_flow=TelegramFlowType.BOOKING.value,
@@ -716,9 +994,11 @@ I can check which {spec_esc} doctors are available at CityCare\\. Which day woul
             flow_data=flow_data,
         )
 
-        await self.adapter.send_message(
+        await send_conversational_response(
+            adapter=self.adapter,
             chat_id=chat_id,
             text="\n".join(lines),
+            session=session,
             reply_markup=doctors_keyboard(doctors[:6]),
         )
 
@@ -745,6 +1025,16 @@ I can check which {spec_esc} doctors are available at CityCare\\. Which day woul
 
         # 1. Resolve Doctor
         doc_query = entities.get("doctor_name")
+        presented_docs = flow_data.get("presented_doctors", [])
+        if not flow_data.get("doctor_id") and presented_docs:
+            ref_doc = resolve_doctor_reference(query, presented_docs)
+            if ref_doc:
+                flow_data["doctor_id"] = ref_doc["id"]
+                flow_data["doctor_name"] = ref_doc.get("name") or f"Dr. {ref_doc.get('first_name')} {ref_doc.get('last_name')}"
+                flow_data["hospital_id"] = ref_doc.get("hospital_id")
+                flow_data["hospital_name"] = ref_doc.get("hospital_name") or "Central Branch"
+                flow_data["specialization"] = ref_doc.get("specialization") or flow_data.get("specialization")
+
         if doc_query and not flow_data.get("doctor_id"):
             active_docs = await list_active_doctors()
             matched = [
@@ -768,6 +1058,19 @@ I can check which {spec_esc} doctors are available at CityCare\\. Which day woul
             if not doctors:
                 doctors = await list_active_doctors()
 
+            flow_data["presented_doctors"] = [
+                {
+                    "id": d["id"],
+                    "name": f"Dr. {d.get('first_name')} {d.get('last_name')}",
+                    "first_name": d.get("first_name"),
+                    "last_name": d.get("last_name"),
+                    "specialization": d.get("specialization"),
+                    "hospital_id": d.get("hospital_id"),
+                    "hospital_name": d.get("hospital_name") or "Central Branch",
+                }
+                for d in doctors[:6]
+            ]
+
             await SessionManager.update_flow(
                 session_key=session.session_key,
                 current_flow=TelegramFlowType.BOOKING.value,
@@ -775,9 +1078,11 @@ I can check which {spec_esc} doctors are available at CityCare\\. Which day woul
                 flow_data=flow_data,
             )
 
-            await self.adapter.send_message(
+            await send_conversational_response(
+                adapter=self.adapter,
                 chat_id=chat_id,
                 text="Which doctor would you like to see?",
+                session=session,
                 reply_markup=doctors_keyboard(doctors[:6]),
             )
             return
@@ -800,9 +1105,11 @@ I can check which {spec_esc} doctors are available at CityCare\\. Which day woul
                 flow_data=flow_data,
             )
 
-            await self.adapter.send_message(
+            await send_conversational_response(
+                adapter=self.adapter,
                 chat_id=chat_id,
                 text=f"*{d_name}* is available for appointments\\. Which day would you prefer?",
+                session=session,
                 reply_markup=dates_keyboard(dates),
             )
             return
@@ -823,12 +1130,18 @@ I can check which {spec_esc} doctors are available at CityCare\\. Which day woul
             await self.adapter.send_message(
                 chat_id=chat_id,
                 text=f"Unfortunately *{d_name}* has no open slots on *{date_esc}*\\. Could you choose a different date?",
-                reply_markup=dates_keyboard([]),
             )
             return
 
         open_slots = avail.get("available_slots", [])
+        flow_data["presented_slots"] = open_slots[:12]
         slot = flow_data.get("slot")
+
+        if not slot:
+            ref_slot = resolve_slot_reference(query, open_slots[:12])
+            if ref_slot:
+                slot = ref_slot
+                flow_data["slot"] = slot
 
         if not slot or slot not in open_slots:
             # If user typed slot that doesn't match perfectly, check normalized
@@ -852,9 +1165,12 @@ I can check which {spec_esc} doctors are available at CityCare\\. Which day woul
                 )
                 d_name = escape_markdown(flow_data.get("doctor_name", "Doctor"))
                 date_esc = escape_markdown(target_date)
-                await self.adapter.send_message(
+                slots_preview = ", ".join(open_slots[:2])
+                await send_conversational_response(
+                    adapter=self.adapter,
                     chat_id=chat_id,
                     text=f"Here are the available slots for *{d_name}* on *{date_esc}*\\. Which time works best for you?",
+                    session=session,
                     reply_markup=slots_keyboard(open_slots[:12]),
                 )
                 return
@@ -862,8 +1178,8 @@ I can check which {spec_esc} doctors are available at CityCare\\. Which day woul
         # 4. Resolve Reason / Symptoms
         reason = flow_data.get("reason")
         if not reason:
-            # If query is not just slot and contains clinical description, use it
-            if len(query.split()) > 3 and not re.search(r"^\b(10|11|12|[1-9]):[0-5][0-9]\b", query):
+            is_slot_ref = bool(re.search(r"^\b(10|11|12|[1-9]):[0-5][0-9]\b", query) or re.search(r"\b(first|second|third|slot)\b", query.lower()))
+            if len(query.split()) > 2 and not is_slot_ref:
                 reason = query
                 flow_data["reason"] = reason
             else:
@@ -889,6 +1205,7 @@ I can check which {spec_esc} doctors are available at CityCare\\. Which day woul
                 "doctor_name": flow_data.get("doctor_name"),
                 "hospital_id": flow_data.get("hospital_id"),
                 "hospital_name": flow_data.get("hospital_name"),
+                "specialization": flow_data.get("specialization"),
                 "date": target_date,
                 "slot": slot,
                 "reason": reason,
@@ -921,25 +1238,29 @@ I can check which {spec_esc} doctors are available at CityCare\\. Which day woul
                 flow_data=flow_data,
             )
 
-            h_name = escape_markdown(flow_data.get("hospital_name", "Central Clinic Branch"))
+            h_name = escape_markdown(flow_data.get("hospital_name", "CityCare Central"))
             d_name = escape_markdown(flow_data.get("doctor_name", "Specialist Doctor"))
+            dept = escape_markdown(flow_data.get("specialization", "General Medicine"))
             date_val = escape_markdown(target_date)
             slot_val = escape_markdown(slot)
             reason_esc = escape_markdown(reason)
 
-            summary = f"""📋 *Appointment Summary*
+            summary = f"""📋 *Appointment Summary* — Here's what I have:
 
-🏥 *Hospital:* {h_name}
 👨‍⚕️ *Doctor:* {d_name}
+🩺 *Department:* {dept}
+🏥 *Hospital:* {h_name}
 📅 *Date:* {date_val}
 ⏰ *Time:* {slot_val}
 📝 *Reason:* {reason_esc}
 
-Would you like to confirm this booking?"""
+Would you like me to book this appointment?"""
 
-            await self.adapter.send_message(
+            await send_conversational_response(
+                adapter=self.adapter,
                 chat_id=chat_id,
                 text=summary,
+                session=session,
                 reply_markup=confirmation_keyboard(),
             )
             return
@@ -962,31 +1283,32 @@ Would you like to confirm this booking?"""
 
             confirm_text = f"""✅ *Appointment Confirmed!*
 
-Your appointment with *{d_name}* at *{h_name}* is booked\\.
+You're booked with *{d_name}* at *{h_name}* on *{escape_markdown(target_date)}* at *{escape_markdown(slot)}*\\. Your appointment has been confirmed\\.
 
-📅 *Date:* {escape_markdown(target_date)}
-⏰ *Time:* {escape_markdown(slot)}
+🆔 *Booking Reference:* `{appt_id}`
 📝 *Reason:* {escape_markdown(reason)}
-🆔 *Reference:* `{appt_id}`
 
 _Please arrive 15 minutes before your scheduled appointment time\\._"""
 
-            await self.adapter.send_message(
+            await send_conversational_response(
+                adapter=self.adapter,
                 chat_id=chat_id,
                 text=confirm_text,
-                reply_markup=main_menu_keyboard(is_verified=True),
+                session=session,
+                reply_markup=compact_menu_keyboard(is_verified=True),
             )
         except SlotConflictError:
-            await self.adapter.send_message(
+            await send_conversational_response(
+                adapter=self.adapter,
                 chat_id=chat_id,
                 text="⚠️ *Slot Conflict*\n\nThat slot was just booked by another patient\\. Please choose another available slot:",
+                session=session,
                 reply_markup=slots_keyboard(open_slots),
             )
         except BookingError as exc:
             await self.adapter.send_message(
                 chat_id=chat_id,
                 text=f"❌ *Booking Error:* {escape_markdown(str(exc))}",
-                reply_markup=main_menu_keyboard(is_verified=True),
             )
 
     async def _handle_context_switch(
@@ -997,18 +1319,99 @@ _Please arrive 15 minutes before your scheduled appointment time\\._"""
         query: str,
         entities: Dict[str, Any],
     ) -> None:
-        """Handle patient changing mind: 'Actually, I want a different doctor'."""
+        """Handle patient changing mind: 'Actually, I want a different doctor' or 'Actually Friday'."""
         flow_data = dict(session.flow_data or {})
-        spec = flow_data.get("specialization")
+        lower = query.lower()
 
-        # Clear doctor and slot selection, keep specialization and date if appropriate
+        # 1. Date change
+        if (
+            entities.get("switch") == "date"
+            or re.search(r"\b(change\s*(?:the\s*)?date|different\s*date|another\s*date|actually\s+(?:monday|tuesday|wednesday|thursday|friday|saturday|sunday|tomorrow|today))\b", lower)
+            or (flow_data.get("doctor_id") and entities.get("date") and not entities.get("doctor_name"))
+        ):
+            flow_data.pop("slot", None)
+            flow_data.pop("presented_slots", None)
+            new_date = entities.get("date") or parse_relative_date(query)
+            if new_date:
+                flow_data["date"] = new_date
+                doc_id = flow_data.get("doctor_id")
+                d_name = escape_markdown(flow_data.get("doctor_name", "the doctor"))
+                avail = await get_doctor_availability(doc_id, new_date)
+                if avail.get("is_available") and avail.get("available_slots"):
+                    open_slots = avail.get("available_slots", [])
+                    flow_data["presented_slots"] = open_slots[:12]
+                    await SessionManager.update_flow(
+                        session_key=session.session_key,
+                        current_flow=TelegramFlowType.BOOKING.value,
+                        flow_step="select_slot",
+                        flow_data=flow_data,
+                    )
+                    date_esc = escape_markdown(new_date)
+                    await send_conversational_response(
+                        adapter=self.adapter,
+                        chat_id=chat_id,
+                        text=f"No problem\\! I've updated the date to *{date_esc}* for *{d_name}*\\. Which time slot works best for you?",
+                        session=session,
+                        reply_markup=slots_keyboard(open_slots[:12]),
+                    )
+                    return
+                else:
+                    flow_data.pop("date", None)
+                    await SessionManager.update_flow(
+                        session_key=session.session_key,
+                        current_flow=TelegramFlowType.BOOKING.value,
+                        flow_step="select_date",
+                        flow_data=flow_data,
+                    )
+                    date_esc = escape_markdown(new_date)
+                    await self.adapter.send_message(
+                        chat_id=chat_id,
+                        text=f"*{d_name}* has no open slots on *{date_esc}*\\. What date would work best for you?",
+                    )
+                    return
+            else:
+                flow_data.pop("date", None)
+                await SessionManager.update_flow(
+                    session_key=session.session_key,
+                    current_flow=TelegramFlowType.BOOKING.value,
+                    flow_step="select_date",
+                    flow_data=flow_data,
+                )
+                await self.adapter.send_message(
+                    chat_id=chat_id,
+                    text="What date would work best for you?",
+                )
+                return
+
+        # 2. Doctor change
+        spec = flow_data.get("specialization")
+        old_doc_id = flow_data.get("doctor_id")
+
         flow_data.pop("doctor_id", None)
         flow_data.pop("doctor_name", None)
         flow_data.pop("slot", None)
+        flow_data.pop("presented_slots", None)
 
         doctors = await list_active_doctors(specialization=spec)
         if not doctors:
             doctors = await list_active_doctors()
+
+        other_doctors = [d for d in doctors if d["id"] != old_doc_id]
+        if other_doctors:
+            doctors = other_doctors
+
+        flow_data["presented_doctors"] = [
+            {
+                "id": d["id"],
+                "name": f"Dr. {d.get('first_name')} {d.get('last_name')}",
+                "first_name": d.get("first_name"),
+                "last_name": d.get("last_name"),
+                "specialization": d.get("specialization"),
+                "hospital_id": d.get("hospital_id"),
+                "hospital_name": d.get("hospital_name") or "Central Branch",
+            }
+            for d in doctors[:6]
+        ]
 
         await SessionManager.update_flow(
             session_key=session.session_key,
@@ -1018,9 +1421,11 @@ _Please arrive 15 minutes before your scheduled appointment time\\._"""
         )
 
         spec_text = f" in *{escape_markdown(spec)}*" if spec else ""
-        await self.adapter.send_message(
+        await send_conversational_response(
+            adapter=self.adapter,
             chat_id=chat_id,
-            text=f"No problem\\! Let's choose another doctor{spec_text}\\. Which specialist would you prefer?",
+            text=f"No problem\\! I'll look for another doctor with the same specialty{spec_text}\\. Which doctor would you prefer?",
+            session=session,
             reply_markup=doctors_keyboard(doctors[:6]),
         )
 
@@ -1037,10 +1442,12 @@ _Please arrive 15 minutes before your scheduled appointment time\\._"""
         """Conversational registration supporting multi-entity extraction and confirmation card."""
         if patient:
             p_name = escape_markdown(f"{patient.get('first_name')} {patient.get('last_name')}")
-            await self.adapter.send_message(
+            await send_conversational_response(
+                adapter=self.adapter,
                 chat_id=chat_id,
                 text=f"ℹ️ *Already Registered*\n\nYou already have an active profile linked as *{p_name}*\\.",
-                reply_markup=main_menu_keyboard(is_verified=True),
+                session=session,
+                reply_markup=compact_menu_keyboard(is_verified=True),
             )
             return
 
@@ -1054,7 +1461,7 @@ _Please arrive 15 minutes before your scheduled appointment time\\._"""
 
         # Check confirmation intent when in confirmation step
         is_confirm = bool(
-            re.search(r"^\b(yes|confirm|proceed|create|create profile|looks good|correct|agree|sure)\b", query.lower())
+            re.search(r"^\b(yes|confirm|proceed|create|create profile|looks good|correct|agree|sure|book it|book|go ahead)\b", query.lower())
         )
         is_cancel = bool(re.search(r"^\b(cancel|no|stop|forget it)\b", query.lower()))
         is_edit = bool(re.search(r"^\b(edit|change|update)\b", query.lower()))
@@ -1064,7 +1471,6 @@ _Please arrive 15 minutes before your scheduled appointment time\\._"""
             await self.adapter.send_message(
                 chat_id=chat_id,
                 text="❌ *Registration Cancelled*\n\nYour temporary registration details have been cleared\\. How else can I help you?",
-                reply_markup=main_menu_keyboard(is_verified=False),
             )
             return
 
@@ -1100,7 +1506,7 @@ _Please arrive 15 minutes before your scheduled appointment time\\._"""
             return
 
         # Step 2: Missing DOB
-        if not has_dob and session.flow_step == "enter_name":
+        if not has_dob:
             await SessionManager.update_flow(
                 session_key=session.session_key,
                 current_flow=TelegramFlowType.REGISTRATION.value,
@@ -1165,9 +1571,11 @@ _Please arrive 15 minutes before your scheduled appointment time\\._"""
 
 Would you like me to create your patient profile?"""
 
-        await self.adapter.send_message(
+        await send_conversational_response(
+            adapter=self.adapter,
             chat_id=chat_id,
             text=summary,
+            session=session,
             reply_markup=registration_summary_keyboard(),
         )
 
@@ -1268,40 +1676,49 @@ _All Telegram assistant features are now fully unlocked\\._"""
 
 Would you like to confirm this booking?"""
 
-            await self.adapter.send_message(
+            await send_conversational_response(
+                adapter=self.adapter,
                 chat_id=chat_id,
                 text=resume_text,
+                session=session,
                 reply_markup=confirmation_keyboard(),
             )
         else:
             await SessionManager.clear_flow(session.session_key)
-            await self.adapter.send_message(
+            await send_conversational_response(
+                adapter=self.adapter,
                 chat_id=chat_id,
                 text=welcome,
-                reply_markup=main_menu_keyboard(is_verified=True),
+                session=session,
+                reply_markup=compact_menu_keyboard(is_verified=True),
             )
 
     async def _handle_view_appointments(
         self,
         chat_id: int,
         patient: Optional[Dict[str, Any]],
+        session: Optional[TelegramSession] = None,
     ) -> None:
         """Display appointments for verified patient with cancellation option."""
         if not patient:
-            await self.adapter.send_message(
+            await send_conversational_response(
+                adapter=self.adapter,
                 chat_id=chat_id,
                 text="🔒 To view your appointment history, please link your CityCare account with /link or register with /register.",
-                reply_markup=main_menu_keyboard(is_verified=False),
+                session=session,
+                reply_markup=compact_menu_keyboard(is_verified=False),
             )
             return
 
         patient_id = str(patient["_id"])
         appts = await get_patient_appointments(patient_id)
         if not appts:
-            await self.adapter.send_message(
+            await send_conversational_response(
+                adapter=self.adapter,
                 chat_id=chat_id,
                 text="📋 *My Appointments*\n\nYou do not have any scheduled appointments\\.\n\nYou can say *'Book an appointment'* anytime to see a doctor\\.",
-                reply_markup=main_menu_keyboard(is_verified=True),
+                session=session,
+                reply_markup=compact_menu_keyboard(is_verified=True),
             )
             return
 
@@ -1324,9 +1741,11 @@ Would you like to confirm this booking?"""
         buttons.append([{"text": "📅 Book New Appointment", "callback_data": "nav:book"}])
         buttons.append([{"text": "🔙 Main Menu", "callback_data": "nav:main"}])
 
-        await self.adapter.send_message(
+        await send_conversational_response(
+            adapter=self.adapter,
             chat_id=chat_id,
             text="\n".join(lines),
+            session=session,
             reply_markup=build_inline_keyboard(buttons),
         )
 
@@ -1420,7 +1839,12 @@ Would you like to confirm this booking?"""
             reply_markup=hospitals_keyboard(hospitals, callback_prefix="view:hosp:"),
         )
 
-    async def _handle_help(self, chat_id: int, patient: Optional[Dict[str, Any]]) -> None:
+    async def _handle_help(
+        self,
+        chat_id: int,
+        patient: Optional[Dict[str, Any]],
+        session: Optional[TelegramSession] = None,
+    ) -> None:
         """Help and usage guidance."""
         help_msg = """🏥 *CityCare Patient Assistant Guide*
 
@@ -1445,10 +1869,12 @@ I can assist you naturally with your healthcare needs\\! Just type what you want
 • _"Actually, I want a different doctor"_
 • _"I changed my mind" / /cancel_"""
 
-        await self.adapter.send_message(
+        await send_conversational_response(
+            adapter=self.adapter,
             chat_id=chat_id,
             text=help_msg,
-            reply_markup=main_menu_keyboard(is_verified=bool(patient)),
+            session=session,
+            reply_markup=compact_menu_keyboard(is_verified=bool(patient)),
         )
 
     async def _handle_general_fallback(

@@ -37,8 +37,9 @@ from telegram_gateway.flows.registration_flow import (
     handle_registration_text_message,
 )
 from telegram_gateway.assistant import ConversationalAssistant
+from telegram_gateway.conversation_policy import clear_stale_keyboard, send_conversational_response
 from telegram_gateway.identity_manager import IdentityManager
-from telegram_gateway.keyboards import main_menu_keyboard
+from telegram_gateway.keyboards import main_menu_keyboard, compact_menu_keyboard
 from telegram_gateway.models import TelegramFlowType, TelegramIdempotencyStatus
 from telegram_gateway.rate_limiter import MongoRateLimiter
 from telegram_gateway.session_manager import SessionManager
@@ -217,14 +218,16 @@ class TelegramRouter:
             patient_id=patient_id,
         )
 
+        # Prune stale inline keyboard from prior messages as soon as user speaks
+        await clear_stale_keyboard(self.adapter, chat_id, session)
+
         # 5. Handle Global Slash Commands
         lower_text = text.lower()
         if lower_text in ("/cancel", "/reset"):
             await SessionManager.clear_flow(session.session_key)
             await self.adapter.send_message(
                 chat_id=chat_id,
-                text="🔄 *Workflow Reset*\n\nActive operations have been cleared\\. How can CityCare assist you today?",
-                reply_markup=main_menu_keyboard(is_verified=bool(patient)),
+                text="No problem\\. I've cancelled that request\\. What would you like to do instead?",
             )
             return
 
@@ -240,20 +243,24 @@ class TelegramRouter:
 
 I can help you book specialist appointments, explore hospital branches, access medical prescriptions, and answer healthcare questions\\.
 
-Please select an option below:"""
+How can I help you today?"""
 
-            await self.adapter.send_message(
+            await send_conversational_response(
+                adapter=self.adapter,
                 chat_id=chat_id,
                 text=welcome_msg,
-                reply_markup=main_menu_keyboard(is_verified=bool(patient)),
+                session=session,
+                reply_markup=compact_menu_keyboard(is_verified=bool(patient)),
             )
             return
 
         if lower_text == "/help":
-            await self.adapter.send_message(
+            await send_conversational_response(
+                adapter=self.adapter,
                 chat_id=chat_id,
                 text=HELP_TEXT,
-                reply_markup=main_menu_keyboard(is_verified=bool(patient)),
+                session=session,
+                reply_markup=compact_menu_keyboard(is_verified=bool(patient)),
             )
             return
 
@@ -406,10 +413,12 @@ Please use /link to link your existing CityCare account or /register to create a
         if data == "nav:main":
             await SessionManager.clear_flow(session.session_key)
             await self.adapter.answer_callback_query(cq_id)
-            await self.adapter.send_message(
+            await send_conversational_response(
+                adapter=self.adapter,
                 chat_id=chat_id,
                 text="🏥 *CityCare Main Menu*",
-                reply_markup=main_menu_keyboard(is_verified=bool(patient)),
+                session=session,
+                reply_markup=compact_menu_keyboard(is_verified=bool(patient)),
             )
             return
 

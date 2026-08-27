@@ -33,7 +33,9 @@ from telegram_gateway.keyboards import (
     slots_keyboard,
     confirmation_keyboard,
     main_menu_keyboard,
+    compact_menu_keyboard,
 )
+from telegram_gateway.conversation_policy import clear_stale_keyboard, send_conversational_response
 from telegram_gateway.models import TelegramFlowType, TelegramSession
 from telegram_gateway.session_manager import SessionManager
 from app.utils.logger import get_logger
@@ -83,9 +85,11 @@ async def start_booking_flow(
         flow_data={},
     )
 
-    await adapter.send_message(
+    await send_conversational_response(
+        adapter=adapter,
         chat_id=chat_id,
         text="📅 *Step 1/5: Select Hospital Branch*\n\nChoose the clinic or hospital location for your visit:",
+        session=session,
         reply_markup=hospitals_keyboard(hospitals),
     )
 
@@ -104,6 +108,8 @@ async def handle_booking_text_message(
     from telegram_gateway.assistant import (
         parse_relative_date,
         parse_time_slot,
+        resolve_doctor_reference,
+        resolve_slot_reference,
         SYMPTOM_SPECIALIZATION_MAP,
     )
 
@@ -113,36 +119,85 @@ async def handle_booking_text_message(
     flow_data = dict(session.flow_data or {})
 
     # 1. Check for cancel / changed mind
-    if re.search(r"\b(changed my mind|forget it|forget that|nevermind|start over|cancel)\b", lower_text):
+    if re.search(r"\b(changed my mind|forget it|forget that|nevermind|never mind|start over|cancel|cancel that)\b", lower_text):
         await SessionManager.clear_flow(session.session_key)
         await adapter.send_message(
             chat_id=chat_id,
-            text="❌ *Booking Cancelled*\n\nYour active booking session has been cleared\\. How can CityCare assist you today?",
-            reply_markup=main_menu_keyboard(is_verified=bool(patient)),
+            text="No problem\\. I've cancelled that request\\. What would you like to do instead?",
         )
         return True
 
     # 2. Check for switching doctor
-    if re.search(r"\b(different doctor|another doctor|change doctor|switch doctor)\b", lower_text):
+    if re.search(r"\b(different doctor|another doctor|change doctor|switch doctor|someone else|actually,? someone else)\b", lower_text):
+        old_doc_id = flow_data.get("doctor_id")
         flow_data.pop("doctor_id", None)
         flow_data.pop("doctor_name", None)
         flow_data.pop("slot", None)
+        flow_data.pop("presented_slots", None)
         spec = flow_data.get("specialization")
         doctors = await list_active_doctors(specialization=spec)
         if not doctors:
             doctors = await list_active_doctors()
+        other_doctors = [d for d in doctors if d["id"] != old_doc_id]
+        if other_doctors:
+            doctors = other_doctors
+        flow_data["presented_doctors"] = [
+            {
+                "id": d["id"],
+                "name": f"Dr. {d.get('first_name')} {d.get('last_name')}",
+                "first_name": d.get("first_name"),
+                "last_name": d.get("last_name"),
+                "specialization": d.get("specialization"),
+                "hospital_id": d.get("hospital_id"),
+                "hospital_name": d.get("hospital_name") or "Central Branch",
+            }
+            for d in doctors[:6]
+        ]
         await SessionManager.update_flow(
             session_key=session.session_key,
             current_flow=TelegramFlowType.BOOKING.value,
             flow_step="select_doctor",
             flow_data=flow_data,
         )
-        await adapter.send_message(
+        spec_esc = f" in *{escape_markdown(spec)}*" if spec else ""
+        await send_conversational_response(
+            adapter=adapter,
             chat_id=chat_id,
-            text="No problem\\! Which doctor or department would you prefer instead?",
+            text=f"No problem\\! I'll look for another doctor with the same specialty{spec_esc}\\. Which doctor would you prefer?",
+            session=session,
             reply_markup=doctors_keyboard(doctors[:6]),
         )
         return True
+
+    # Check for switching date
+    if re.search(r"\b(change\s*(?:the\s*)?date|different\s*date|another\s*date|actually\s+(?:monday|tuesday|wednesday|thursday|friday|saturday|sunday|tomorrow|today))\b", lower_text):
+        flow_data.pop("slot", None)
+        flow_data.pop("presented_slots", None)
+        new_date = parse_relative_date(clean_text)
+        if new_date:
+            flow_data["date"] = new_date
+            doc_id = flow_data.get("doctor_id")
+            if doc_id:
+                d_name = escape_markdown(flow_data.get("doctor_name", "the doctor"))
+                avail = await get_doctor_availability(doc_id, new_date)
+                if avail.get("is_available") and avail.get("available_slots"):
+                    open_slots = avail.get("available_slots", [])
+                    flow_data["presented_slots"] = open_slots[:12]
+                    await SessionManager.update_flow(
+                        session_key=session.session_key,
+                        current_flow=TelegramFlowType.BOOKING.value,
+                        flow_step="select_slot",
+                        flow_data=flow_data,
+                    )
+                    date_esc = escape_markdown(new_date)
+                    await send_conversational_response(
+                        adapter=adapter,
+                        chat_id=chat_id,
+                        text=f"No problem\\! I've updated the date to *{date_esc}* for *{d_name}*\\. Which time slot works best for you?",
+                        session=session,
+                        reply_markup=slots_keyboard(open_slots[:12]),
+                    )
+                    return True
 
     # 3. Handle step: select_hospital
     if flow_step == "select_hospital":
@@ -164,24 +219,30 @@ async def handle_booking_text_message(
                 flow_data=flow_data,
             )
             h_esc = escape_markdown(matched_hosp.get("name"))
-            await adapter.send_message(
+            await send_conversational_response(
+                adapter=adapter,
                 chat_id=chat_id,
                 text=f"🏥 *Branch:* {h_esc}\n\nWhich doctor would you like to see?",
+                session=session,
                 reply_markup=doctors_keyboard(doctors[:6]),
             )
             return True
 
     # 4. Handle step: select_doctor
     if flow_step in ("select_doctor", "select_specialization") or not flow_data.get("doctor_id"):
-        # Check doctor name
-        doctors = await list_active_doctors()
-        matched_doc = None
-        for d in doctors:
-            full = f"{d.get('first_name', '')} {d.get('last_name', '')}".lower()
-            last = d.get('last_name', '').lower()
-            if lower_text in full or last in lower_text or lower_text in last:
-                matched_doc = d
-                break
+        # First check resolve_doctor_reference from presented_doctors
+        matched_doc = resolve_doctor_reference(clean_text, flow_data.get("presented_doctors", []))
+        if not matched_doc:
+            # Check doctor name across active doctors
+            doctors = await list_active_doctors()
+            for d in doctors:
+                full = f"{d.get('first_name', '')} {d.get('last_name', '')}".lower()
+                last = d.get('last_name', '').lower()
+                first = d.get('first_name', '').lower()
+                if lower_text in full or last in lower_text or lower_text in last or first in lower_text:
+                    matched_doc = d
+                    break
+
         if matched_doc:
             flow_data["doctor_id"] = matched_doc["id"]
             flow_data["doctor_name"] = f"Dr. {matched_doc.get('first_name')} {matched_doc.get('last_name')}"
@@ -199,6 +260,25 @@ async def handle_booking_text_message(
                 # Check slot availability
                 avail = await get_doctor_availability(matched_doc["id"], flow_data["date"])
                 open_slots = avail.get("available_slots", [])
+                flow_data["presented_slots"] = open_slots[:12]
+
+                s_parsed = resolve_slot_reference(clean_text, open_slots[:12]) or parse_time_slot(clean_text)
+                if s_parsed and open_slots and s_parsed in open_slots:
+                    flow_data["slot"] = s_parsed
+                    await SessionManager.update_flow(
+                        session_key=session.session_key,
+                        current_flow=TelegramFlowType.BOOKING.value,
+                        flow_step="enter_reason",
+                        flow_data=flow_data,
+                    )
+                    d_esc = escape_markdown(flow_data["doctor_name"])
+                    slot_esc = escape_markdown(s_parsed)
+                    await adapter.send_message(
+                        chat_id=chat_id,
+                        text=f"Got it\\! {slot_esc} with *{d_esc}*\\. What symptoms or reason for visit should we note for the doctor?",
+                    )
+                    return True
+
                 await SessionManager.update_flow(
                     session_key=session.session_key,
                     current_flow=TelegramFlowType.BOOKING.value,
@@ -207,9 +287,11 @@ async def handle_booking_text_message(
                 )
                 d_esc = escape_markdown(flow_data["doctor_name"])
                 date_esc = escape_markdown(flow_data["date"])
-                await adapter.send_message(
+                await send_conversational_response(
+                    adapter=adapter,
                     chat_id=chat_id,
                     text=f"*{d_esc}* has open slots on *{date_esc}*\\. Which time slot works for you?",
+                    session=session,
                     reply_markup=slots_keyboard(open_slots[:12]),
                 )
                 return True
@@ -227,9 +309,11 @@ async def handle_booking_text_message(
                     flow_data=flow_data,
                 )
                 d_esc = escape_markdown(flow_data["doctor_name"])
-                await adapter.send_message(
+                await send_conversational_response(
+                    adapter=adapter,
                     chat_id=chat_id,
                     text=f"Great\\! You've selected *{d_esc}*\\. Which date would you prefer for your consultation?",
+                    session=session,
                     reply_markup=dates_keyboard(dates),
                 )
                 return True
@@ -242,6 +326,25 @@ async def handle_booking_text_message(
             doc_id = flow_data.get("doctor_id")
             avail = await get_doctor_availability(doc_id, d_parsed)
             open_slots = avail.get("available_slots", [])
+            flow_data["presented_slots"] = open_slots[:12]
+
+            s_parsed = resolve_slot_reference(clean_text, open_slots[:12]) or parse_time_slot(clean_text)
+            if s_parsed and open_slots and s_parsed in open_slots:
+                flow_data["slot"] = s_parsed
+                await SessionManager.update_flow(
+                    session_key=session.session_key,
+                    current_flow=TelegramFlowType.BOOKING.value,
+                    flow_step="enter_reason",
+                    flow_data=flow_data,
+                )
+                d_esc = escape_markdown(flow_data.get("doctor_name", "your doctor"))
+                slot_esc = escape_markdown(s_parsed)
+                await adapter.send_message(
+                    chat_id=chat_id,
+                    text=f"Got it\\! {slot_esc} with *{d_esc}*\\. What symptoms or reason for visit should we note for the doctor?",
+                )
+                return True
+
             await SessionManager.update_flow(
                 session_key=session.session_key,
                 current_flow=TelegramFlowType.BOOKING.value,
@@ -251,22 +354,25 @@ async def handle_booking_text_message(
             d_esc = escape_markdown(flow_data.get("doctor_name", "Doctor"))
             date_esc = escape_markdown(d_parsed)
             if open_slots:
-                await adapter.send_message(
+                await send_conversational_response(
+                    adapter=adapter,
                     chat_id=chat_id,
                     text=f"Here are the available slots for *{d_esc}* on *{date_esc}*\\. Which time works best for you?",
+                    session=session,
                     reply_markup=slots_keyboard(open_slots[:12]),
                 )
             else:
                 await adapter.send_message(
                     chat_id=chat_id,
                     text=f"Unfortunately *{d_esc}* has no open slots on *{date_esc}*\\. Could you choose a different date?",
-                    reply_markup=dates_keyboard([]),
                 )
             return True
 
     # 6. Handle step: select_slot
     if flow_step == "select_slot" or (flow_data.get("doctor_id") and flow_data.get("date") and not flow_data.get("slot")):
-        s_parsed = parse_time_slot(clean_text)
+        s_parsed = resolve_slot_reference(clean_text, flow_data.get("presented_slots", []))
+        if not s_parsed:
+            s_parsed = parse_time_slot(clean_text)
         if s_parsed:
             flow_data["slot"] = s_parsed
             await SessionManager.update_flow(
@@ -307,32 +413,36 @@ async def handle_booking_text_message(
             flow_data=flow_data,
         )
 
-        h_name = escape_markdown(flow_data.get("hospital_name", "Central Clinic Branch"))
-        d_name = escape_markdown(flow_data.get("doctor_name", "Specialist Physician"))
+        h_name = escape_markdown(flow_data.get("hospital_name", "CityCare Central"))
+        d_name = escape_markdown(flow_data.get("doctor_name", "Specialist Doctor"))
+        dept = escape_markdown(flow_data.get("specialization", "General Medicine"))
         date_val = escape_markdown(flow_data.get("date", ""))
         slot_val = escape_markdown(flow_data.get("slot", ""))
         reason_esc = escape_markdown(reason_clean)
 
-        summary_text = f"""📋 *Appointment Summary*
+        summary_text = f"""📋 *Appointment Summary* — Here's what I have:
 
-🏥 *Hospital:* {h_name}
 👨‍⚕️ *Doctor:* {d_name}
+🩺 *Department:* {dept}
+🏥 *Hospital:* {h_name}
 📅 *Date:* {date_val}
-⏰ *Slot:* {slot_val}
+⏰ *Time:* {slot_val}
 📝 *Reason:* {reason_esc}
 
-Please confirm your booking details:"""
+Would you like me to book this appointment?"""
 
-        await adapter.send_message(
+        await send_conversational_response(
+            adapter=adapter,
             chat_id=chat_id,
             text=summary_text,
+            session=session,
             reply_markup=confirmation_keyboard(),
         )
         return True
 
     # 8. Handle step: confirm_booking
     if flow_step == "confirm_booking":
-        if re.search(r"^\b(yes|confirm|proceed|looks good|correct|agree|sure)\b", lower_text):
+        if re.search(r"^\b(yes|confirm|proceed|looks good|correct|agree|sure|book it|book|go ahead)\b", lower_text):
             # Book appointment
             if not patient:
                 # Unregistered patient: transition to registration holding pending booking
@@ -341,6 +451,7 @@ Please confirm your booking details:"""
                     "doctor_name": flow_data.get("doctor_name"),
                     "hospital_id": flow_data.get("hospital_id"),
                     "hospital_name": flow_data.get("hospital_name"),
+                    "specialization": flow_data.get("specialization"),
                     "date": flow_data.get("date"),
                     "slot": flow_data.get("slot"),
                     "reason": flow_data.get("reason"),
@@ -376,32 +487,30 @@ Please confirm your booking details:"""
                 h_name = escape_markdown(flow_data.get("hospital_name", "Central Clinic"))
                 confirm_text = f"""✅ *Appointment Confirmed!*
 
-Your appointment with *{d_name}* at *{h_name}* is booked\\.
+You're booked with *{d_name}* at *{h_name}* on *{escape_markdown(flow_data['date'])}* at *{escape_markdown(flow_data['slot'])}*\\. Your appointment has been confirmed\\.
 
-📅 *Date:* {escape_markdown(flow_data['date'])}
-⏰ *Time:* {escape_markdown(flow_data['slot'])}
+🆔 *Booking Reference:* `{appt_id}`
 📝 *Reason:* {escape_markdown(flow_data.get('reason', 'Consultation'))}
-🆔 *Reference:* `{appt_id}`
 
 _Please arrive 15 minutes before your scheduled appointment time\\._"""
-                await adapter.send_message(
+                await send_conversational_response(
+                    adapter=adapter,
                     chat_id=chat_id,
                     text=confirm_text,
-                    reply_markup=main_menu_keyboard(is_verified=True),
+                    session=session,
+                    reply_markup=compact_menu_keyboard(is_verified=True),
                 )
                 return True
             except SlotConflictError:
                 await adapter.send_message(
                     chat_id=chat_id,
                     text="⚠️ *Slot Conflict*\n\nThat slot was just booked by another patient\\. Please choose another available slot\\.",
-                    reply_markup=main_menu_keyboard(is_verified=True),
                 )
                 return True
             except BookingError as exc:
                 await adapter.send_message(
                     chat_id=chat_id,
                     text=f"❌ *Booking Error:* {escape_markdown(str(exc))}",
-                    reply_markup=main_menu_keyboard(is_verified=True),
                 )
                 return True
 
@@ -426,7 +535,6 @@ async def handle_booking_callback(
         await adapter.send_message(
             chat_id=chat_id,
             text="❌ *Booking Cancelled*\n\nYour active booking session has been cleared\\.",
-            reply_markup=main_menu_keyboard(is_verified=bool(patient)),
         )
         return
 
@@ -462,15 +570,19 @@ async def handle_booking_callback(
 
         h_name_esc = escape_markdown(hospital.get("name"))
         if specs:
-            await adapter.send_message(
+            await send_conversational_response(
+                adapter=adapter,
                 chat_id=chat_id,
                 text=f"🏥 *Branch:* {h_name_esc}\n\n*Step 2/5: Select Department or Specialist*",
+                session=session,
                 reply_markup=specializations_keyboard(specs, hospital_id=hosp_id),
             )
         else:
-            await adapter.send_message(
+            await send_conversational_response(
+                adapter=adapter,
                 chat_id=chat_id,
                 text=f"🏥 *Branch:* {h_name_esc}\n\n*Step 2/5: Select Specialist Doctor*",
+                session=session,
                 reply_markup=doctors_keyboard(doctors),
             )
         return
@@ -498,9 +610,11 @@ async def handle_booking_callback(
         await adapter.answer_callback_query(callback_query_id)
 
         spec_label = f" ({escape_markdown(spec_filter)})" if spec_filter else ""
-        await adapter.send_message(
+        await send_conversational_response(
+            adapter=adapter,
             chat_id=chat_id,
             text=f"👨‍⚕️ *Step 2/5: Select Doctor{spec_label}*",
+            session=session,
             reply_markup=doctors_keyboard(doctors),
         )
         return
@@ -549,9 +663,11 @@ async def handle_booking_callback(
         await adapter.answer_callback_query(callback_query_id)
 
         d_name_esc = escape_markdown(flow_data["doctor_name"])
-        await adapter.send_message(
+        await send_conversational_response(
+            adapter=adapter,
             chat_id=chat_id,
             text=f"👨‍⚕️ *Doctor:* {d_name_esc}\n\n*Step 3/5: Select Appointment Date*",
+            session=session,
             reply_markup=dates_keyboard(dates_list),
         )
         return
@@ -592,13 +708,15 @@ async def handle_booking_callback(
         await adapter.answer_callback_query(callback_query_id)
 
         d_name_esc = escape_markdown(flow_data.get("doctor_name"))
-        await adapter.send_message(
+        await send_conversational_response(
+            adapter=adapter,
             chat_id=chat_id,
             text=(
                 f"👨‍⚕️ *Doctor:* {d_name_esc}\n"
                 f"📅 *Date:* {escape_markdown(date_str)} ({escape_markdown(avail.get('weekday'))})\n\n"
                 f"*Step 4/5: Select Time Slot*"
             ),
+            session=session,
             reply_markup=slots_keyboard(slots),
         )
         return
@@ -616,6 +734,8 @@ async def handle_booking_callback(
         )
         await adapter.answer_callback_query(callback_query_id)
 
+        # Clear prior slots keyboard for text reason entry
+        await clear_stale_keyboard(adapter, chat_id, session)
         await adapter.send_message(
             chat_id=chat_id,
             text=(
@@ -677,9 +797,11 @@ async def handle_booking_callback(
             )
             # Re-fetch availability and show remaining slots
             avail = await get_doctor_availability(doc_id, date_val, tz_name=tz_name)
-            await adapter.send_message(
+            await send_conversational_response(
+                adapter=adapter,
                 chat_id=chat_id,
                 text="⚠️ *Slot No Longer Available*\n\nPlease select an alternative slot:",
+                session=session,
                 reply_markup=slots_keyboard(avail.get("available_slots", [])),
             )
             return
@@ -710,10 +832,12 @@ async def handle_booking_callback(
 
 _Please arrive 15 minutes before your scheduled appointment time\\._"""
 
-        await adapter.send_message(
+        await send_conversational_response(
+            adapter=adapter,
             chat_id=chat_id,
             text=confirmation_msg,
-            reply_markup=main_menu_keyboard(is_verified=True),
+            session=session,
+            reply_markup=compact_menu_keyboard(is_verified=True),
         )
         return
 
@@ -795,7 +919,7 @@ async def handle_appointment_cancel_callback(
         await adapter.send_message(
             chat_id=chat_id,
             text=f"✅ *Appointment Cancelled*\n\nAppointment `{escape_markdown(appointment_id)}` was cancelled successfully\\. The slot is now available for other patients\\.",
-            reply_markup=main_menu_keyboard(is_verified=True),
+            reply_markup=compact_menu_keyboard(is_verified=True),
         )
     except BookingError as exc:
         await adapter.answer_callback_query(callback_query_id, text=str(exc), show_alert=True)

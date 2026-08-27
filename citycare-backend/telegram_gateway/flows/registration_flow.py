@@ -9,7 +9,13 @@ from app.cruds import user_crud
 from app.services.registration_service import register_patient
 from telegram_gateway.adapter import TelegramAdapter, escape_markdown
 from telegram_gateway.identity_manager import IdentityManager
-from telegram_gateway.keyboards import consent_keyboard, main_menu_keyboard, registration_summary_keyboard
+from telegram_gateway.keyboards import (
+    consent_keyboard,
+    main_menu_keyboard,
+    compact_menu_keyboard,
+    registration_summary_keyboard,
+)
+from telegram_gateway.conversation_policy import clear_stale_keyboard, send_conversational_response
 from telegram_gateway.models import TelegramFlowType, TelegramSession
 from telegram_gateway.session_manager import SessionManager
 from app.utils.logger import get_logger
@@ -45,9 +51,11 @@ async def show_registration_summary(
 
 Would you like me to create your patient profile?"""
 
-    await adapter.send_message(
+    await send_conversational_response(
+        adapter=adapter,
         chat_id=chat_id,
         text=summary,
+        session=session,
         reply_markup=registration_summary_keyboard(),
     )
 
@@ -145,17 +153,21 @@ _This link is valid for 48 hours\\. You can use all Telegram bot features immedi
 
 Would you like to confirm this booking?"""
 
-        await adapter.send_message(
+        await send_conversational_response(
+            adapter=adapter,
             chat_id=chat_id,
             text=resume_text,
+            session=session,
             reply_markup=confirmation_keyboard(),
         )
     else:
         await SessionManager.clear_flow(session.session_key)
-        await adapter.send_message(
+        await send_conversational_response(
+            adapter=adapter,
             chat_id=chat_id,
             text=welcome_msg,
-            reply_markup=main_menu_keyboard(is_verified=True),
+            session=session,
+            reply_markup=compact_menu_keyboard(is_verified=True),
         )
 
 
@@ -250,7 +262,6 @@ async def handle_registration_callback(
         await adapter.send_message(
             chat_id=chat_id,
             text="❌ *Registration Cancelled*\n\nYour temporary registration details have been cleared\\. How else can I help you?",
-            reply_markup=main_menu_keyboard(is_verified=False),
         )
         return
 
@@ -340,7 +351,6 @@ async def handle_registration_text_message(
         await adapter.send_message(
             chat_id=chat_id,
             text="❌ *Registration Cancelled*\n\nYour temporary registration details have been cleared\\. How else can I help you?",
-            reply_markup=main_menu_keyboard(is_verified=False),
         )
         return True
 

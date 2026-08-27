@@ -165,3 +165,41 @@ def quick_departments_keyboard(specializations: Optional[List[str]] = None) -> D
     buttons.append([{"text": "👨‍⚕️ View All Doctors", "callback_data": "nav:doctors"}])
     return build_inline_keyboard(buttons)
 
+
+def single_action_keyboard(text: str, callback_data: str) -> Dict[str, Any]:
+    """Single optional shortcut button (e.g. [Find a Dermatologist])."""
+    return build_inline_keyboard([[{"text": text, "callback_data": callback_data}]])
+
+
+def quick_shortcut_keyboard(shortcuts: List[Dict[str, str]]) -> Dict[str, Any]:
+    """Row or list of minimal optional shortcuts."""
+    buttons = [[{"text": s["text"], "callback_data": s["callback_data"]} for s in shortcuts]]
+    return build_inline_keyboard(buttons)
+
+
+def compact_menu_keyboard(is_verified: bool = False) -> Dict[str, Any]:
+    """Compact 2-row menu keyboard for casual shortcuts."""
+    if is_verified:
+        buttons = [
+            [
+                {"text": "📅 Book Appointment", "callback_data": "nav:book"},
+                {"text": "📋 My Appointments", "callback_data": "nav:my_appointments"},
+            ],
+            [
+                {"text": "💊 Prescriptions", "callback_data": "nav:my_prescriptions"},
+                {"text": "❓ Help", "callback_data": "nav:help"},
+            ],
+        ]
+    else:
+        buttons = [
+            [
+                {"text": "📅 Book Appointment", "callback_data": "nav:book"},
+                {"text": "📝 Register", "callback_data": "nav:register"},
+            ],
+            [
+                {"text": "🏥 Hospitals", "callback_data": "nav:hospitals"},
+                {"text": "❓ Help", "callback_data": "nav:help"},
+            ],
+        ]
+    return build_inline_keyboard(buttons)
+
