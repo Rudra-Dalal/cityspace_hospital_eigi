@@ -1,0 +1,7 @@
+{
+  "name": "cityspace-hospital-eigi-root",
+  "private": true,
+  "scripts": {
+    "build": "npm --prefix citycare-frontend install && npm --prefix citycare-frontend run build && node -e \"const fs=require('fs'); if(fs.existsSync('citycare-frontend/.vercel')) fs.cpSync('citycare-frontend/.vercel', '.vercel', {recursive: true, force: true});\""
+  }
+}
