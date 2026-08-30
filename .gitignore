@@ -8,6 +8,7 @@ __pycache__/
 htmlcov/
 node_modules/
 dist/
+.vercel/
 .DS_Store
 Thumbs.db
 .idea/
